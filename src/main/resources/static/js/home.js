@@ -114,7 +114,7 @@ $("#nameEntry").keypress(function (event) {
 	}
 });
 
-// Only allow alphanumeric and whitespace characters as user input
+/* Only allow alphanumeric and whitespace characters as user input
 $("#nameEntry, #game-name-entry").on("input", function (event) {
 	var input = $(this);
 	var currText = input.val();
@@ -122,7 +122,7 @@ $("#nameEntry, #game-name-entry").on("input", function (event) {
 	var cleanedText = currText.replace(/[^A-Za-z0-9\s]+/g, "");
 	input.val(cleanedText);
 });
-
+*/
 // Make sure dynamic rates option only shown when decimal option selected
 $("#decimal-option").click(function () {
 	$("#dynamic-rates-container").removeClass("hidden");
