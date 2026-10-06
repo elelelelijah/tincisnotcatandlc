@@ -53,8 +53,8 @@ public class ReceivingWebsocket {
     if (u != null) { // existing user with old session, update it.
       if (!u.updateSession(s)) {
         // tried to update an open session - TWO TAB MOFO
-        ignoreSession.add(s);
-        this.sendError(s, "DUPLICATE_TAB");
+        //ignoreSession.add(s);
+        //this.sendError(s, "DUPLICATE_TAB");
         return;
       }
     } else {
