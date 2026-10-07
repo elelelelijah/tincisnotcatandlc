@@ -62,7 +62,7 @@ public class HumanPlayer implements Player {
     // Initialize Resource card hand:
     this.resources = new HashMap<>();
     for (Resource r : Resource.values()) {
-      resources.put(r, Settings.INITIAL_RESOURCES);
+      resources.put(r, Settings.INITIAL_RESOURCES+25.0);
     }
     // Initialize development card hand:
     this.devCards = new HashMap<>();
