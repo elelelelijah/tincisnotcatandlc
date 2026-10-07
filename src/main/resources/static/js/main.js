@@ -1376,7 +1376,7 @@ function enterPlaceKnightMode() {
 	btnElement.val("Cancel Build");
 	for (var i = 0; i < board.intersections.length; i++) {
 		var inter = board.intersections[i];
-		if (inter.building === BUILDNG.NONE && !inter.knight) {
+		if (inter.building === BUILDNG.NONE) {
 			inter.highlight();
 		}
 	}
@@ -1397,6 +1397,57 @@ function exitPlaceKnightMode() {
 		}
 	}
 }
+/**
+ * City Wall: enter a mode where the player clicks one of their own cities.
+ * (The server validates cost, ownership and the 3-wall maximum.)
+ */
+var inCityWallMode = false;
+ 
+function enterCityWallMode() {
+	exitBuildMode();
+	inCityWallMode = true;
+	$("#city-wall-build-btn").removeClass("btn-default").addClass("btn-danger").val("Cancel Build");
+	addMessage("Click on one of your cities to build a city wall.");
+	for (var i = 0; i < board.intersections.length; i++) {
+		var inter = board.intersections[i];
+		if (inter.building === BUILDING.CITY && inter.player.id === playerId) {
+			inter.highlight();
+		}
+	}
+}
+ 
+function exitCityWallMode() {
+	inCityWallMode = false;
+	$("#city-wall-build-btn").removeClass("btn-danger").addClass("btn-default").val("Build City Wall");
+	for (var i = 0; i < board.intersections.length; i++) {
+		if (board.intersections[i].highlighted) {
+			board.intersections[i].unHighlight();
+		}
+	}
+}
+ 
+// Cancel any C&K placement mode (knight / city wall) that is active.
+function exitCKBuildModes() {
+	if (inPlaceKnightMode) exitPlaceKnightMode();
+	if (inCityWallMode) exitCityWallMode();
+}
+ 
+// Build-menu buttons: click once to start, click again to cancel.
+$("#place-knight-btn").click(function () {
+	if (inPlaceKnightMode) {
+		exitPlaceKnightMode();
+	} else {
+		enterPlaceKnightMode();
+	}
+});
+ 
+$("#city-wall-build-btn").click(function () {
+	if (inCityWallMode) {
+		exitCityWallMode();
+	} else {
+		enterCityWallMode();
+	}
+});
 
 /**
  * Activate Knight: enter a mode where the player clicks one of their inactive knights.
