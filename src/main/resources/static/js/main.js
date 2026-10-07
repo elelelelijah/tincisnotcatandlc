@@ -1371,9 +1371,9 @@ function enterPlaceKnightMode() {
 	
 	for (var i = 0; i < board.intersections.length; i++) {
 		var inter = board.intersections[i];
-		if (inter.building === BUILDNG.NONE) {
+		//if (inter.building === BUILDNG.NONE) {
 			inter.highlight();
-		}
+		//}
 	}
 }
 
