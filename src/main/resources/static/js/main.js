@@ -1364,13 +1364,12 @@ function exitRemoveRoadMode() {
  * Place Knight: enter a mode where the player clicks an intersection to place a knight.
  */
 var inPlaceKnightMode = false;
-
 function enterPlaceKnightMode() {
 	inPlaceKnightMode = true;
 	addMessage("Click on an intersection adjacent to your city to place a knight.");
 	for (var i = 0; i < board.intersections.length; i++) {
 		var inter = board.intersections[i];
-		if (!inter.building && !inter.knight) {
+		if (inter.building === BUILDNG.NONE && !inter.knight) {
 			inter.highlight();
 		}
 	}
