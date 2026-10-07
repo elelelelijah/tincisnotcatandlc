@@ -31,7 +31,7 @@ public abstract class Settings {
 
   // How many resources should players start with (Beware of changing this.
   // Wildcards!):
-  public final static double INITIAL_RESOURCES = 10.0;
+  public final static double INITIAL_RESOURCES = 0.0;
 
   // Building costs:
   public final static Map<Resource, Double> CITY_COST = ImmutableMap.of(
