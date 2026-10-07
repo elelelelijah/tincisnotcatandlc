@@ -1367,13 +1367,8 @@ var inPlaceKnightMode = false;
 function enterPlaceKnightMode() {
 	inPlaceKnightMode = true;
 	addMessage("Click on an intersection adjacent to your city to place a knight.");
-	var btnElement = $("#place-knight-btn");
-	btnElement.off("click", enterPlaceKnightMode);
-	btnElement.click(exitPlaceKnightMode);
-
-	btnElement.removeClass("btn-default");
-	btnElement.addClass("btn-danger");
-	btnElement.val("Cancel Build");
+	$("#place-knight-btn").removeClass("btn-default").addClass("btn-danger").val("Cancel Build");
+	
 	for (var i = 0; i < board.intersections.length; i++) {
 		var inter = board.intersections[i];
 		if (inter.building === BUILDNG.NONE) {
