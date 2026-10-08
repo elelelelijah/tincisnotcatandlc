@@ -1419,6 +1419,8 @@ function exitCityWallMode() {
 function exitCKBuildModes() {
 	if (inPlaceKnightMode) exitPlaceKnightMode();
 	if (inCityWallMode) exitCityWallMode();
+	if (inActivateKnightMode) exitActivateKnightMode();
+	if (inPromoteKnightMode) exitPromoteKnightMode();
 }
  
 // Build-menu buttons: click once to start, click again to cancel.
@@ -1437,14 +1439,30 @@ $("#city-wall-build-btn").click(function () {
 		enterCityWallMode();
 	}
 });
-
+$("#activate-knight-btn").click(function () {
+	if (inActivateKnightMode) {
+		exitActivateKnightMode();
+	} else {
+		enterActivateKnightMode();
+	}
+});
+ 
+$("#promote-knight-btn").click(function () {
+	if (inPromoteKnightMode) {
+		exitPromoteKnightMode();
+	} else {
+		enterPromoteKnightMode();
+	}
+});
 /**
  * Activate Knight: enter a mode where the player clicks one of their inactive knights.
  */
 var inActivateKnightMode = false;
 
 function enterActivateKnightMode() {
+	exitBuildMode();
 	inActivateKnightMode = true;
+	$("#activate-knight-btn").removeClass("btn-default").addClass("btn-danger").val("Cancel");
 	addMessage("Click on one of your inactive knights to activate it.");
 	for (var i = 0; i < board.intersections.length; i++) {
 		var inter = board.intersections[i];
@@ -1456,6 +1474,7 @@ function enterActivateKnightMode() {
 
 function exitActivateKnightMode() {
 	inActivateKnightMode = false;
+	$("#activate-knight-btn").removeClass("btn-danger").addClass("btn-default").val("Activate Knight");
 	for (var i = 0; i < board.intersections.length; i++) {
 		if (board.intersections[i].highlighted) {
 			board.intersections[i].unHighlight();
@@ -1469,7 +1488,9 @@ function exitActivateKnightMode() {
 var inPromoteKnightMode = false;
 
 function enterPromoteKnightMode() {
+	exitBuildMode();
 	inPromoteKnightMode = true;
+	$("#promote-knight-btn").removeClass("btn-default").addClass("btn-danger").val("Cancel");
 	addMessage("Click on one of your knights to promote it.");
 	for (var i = 0; i < board.intersections.length; i++) {
 		var inter = board.intersections[i];
@@ -1481,6 +1502,7 @@ function enterPromoteKnightMode() {
 
 function exitPromoteKnightMode() {
 	inPromoteKnightMode = false;
+	$("#promote-knight-btn").removeClass("btn-danger").addClass("btn-default").val("Promote Knight");
 	for (var i = 0; i < board.intersections.length; i++) {
 		if (board.intersections[i].highlighted) {
 			board.intersections[i].unHighlight();
