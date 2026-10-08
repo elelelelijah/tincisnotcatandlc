@@ -1448,7 +1448,7 @@ function enterActivateKnightMode() {
 	addMessage("Click on one of your inactive knights to activate it.");
 	for (var i = 0; i < board.intersections.length; i++) {
 		var inter = board.intersections[i];
-		if (inter.knight && inter.knight.owner === playerId && !inter.knight.active) {
+		if (inter.building === BUILDING.KNIGHT && inter.player.id === playerId && !inter.knightActive) {
 			inter.highlight();
 		}
 	}
@@ -1473,7 +1473,7 @@ function enterPromoteKnightMode() {
 	addMessage("Click on one of your knights to promote it.");
 	for (var i = 0; i < board.intersections.length; i++) {
 		var inter = board.intersections[i];
-		if (inter.knight && inter.knight.owner === playerId && inter.knight.level < 3) {
+		if (inter.building === BUILDING.KNIGHT && inter.player.id === playerId && inter.knightLevel < 3) {
 			inter.highlight();
 		}
 	}
@@ -1500,7 +1500,7 @@ function enterDisplaceKnightMode() {
 	// Highlight intersections that have opponent knights
 	for (var i = 0; i < board.intersections.length; i++) {
 		var inter = board.intersections[i];
-		if (inter.knight && inter.knight.owner !== playerId) {
+		if (inter.building === BUILDING.KNIGHT && inter.player.id !== playerId) {
 			inter.highlight();
 		}
 	}
