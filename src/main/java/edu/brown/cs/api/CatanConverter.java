@@ -217,11 +217,27 @@ public class CatanConverter {
           }
         }
       }
-
+         // C&K: knights are stored on players, not on intersections, so build a
+      // lookup of every knight by position for the client to draw.
+      Map<IntersectionCoordinate, KnightPiece> knightMap = new HashMap<>();
+      if (ref.getGameSettings().isCitiesAndKnights) {
+        for (Player p : ref.getPlayers()) {
+          for (KnightPiece k : p.getKnights()) {
+            knightMap.put(k.getPosition(), k);
+          }
+        }
+      }
+ 
       for (Intersection intersection : board.getIntersections().values()) {
         String metro = metropolisMap.get(intersection.getPosition());
-        intersections.add(new IntersectionRaw(intersection, ref, playerID, metro));
+        KnightPiece knight = knightMap.get(intersection.getPosition());
+        intersections.add(new IntersectionRaw(intersection, ref, playerID, metro,
+            knight));
       }
+     /* for (Intersection intersection : board.getIntersections().values()) {
+        String metro = metropolisMap.get(intersection.getPosition());
+        intersections.add(new IntersectionRaw(intersection, ref, playerID, metro));
+      }*/
       paths = new ArrayList<>();
       for (Path path : board.getPaths().values()) {
         paths.add(new PathRaw(ref.getReadOnlyReferee(), path, playerID));
@@ -287,6 +303,18 @@ public class CatanConverter {
       return null;
     }
 
+  }
+  // C&K: a knight standing on an intersection (level is 1=Basic .. 3=Mighty)
+  private static class KnightRaw {
+    private final int player;
+    private final int level;
+    private final boolean active;
+ 
+    KnightRaw(KnightPiece k) {
+      player = k.getOwnerID();
+      level = k.getStrength();
+      active = k.isActive();
+    }
   }
 
   private static class IntersectionRaw {
