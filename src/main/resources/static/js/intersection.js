@@ -227,6 +227,10 @@ Intersection.prototype.createIntersectionClickHandler = function () {
 				sendDisplaceKnightAction(that.intersectCoordinates);
 				exitDisplaceKnightMode();
 			}
+			else if (inDeserterMode) { // Deserter progress card
+				sendDeserterTargetAction(that.player.id, that.intersectCoordinates);
+				exitDeserterTargetMode();
+			}
 		}
 	};
 }
