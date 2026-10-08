@@ -280,7 +280,10 @@ function parseIntersection(data) {
 			intersect.addKnight(player, data.building.level, data.building.active);
 		}
 	}
-
+// C&K: knights are sent separately from buildings
+	if (data.hasOwnProperty("knight") && data.knight) {
+		intersect.addKnight(playersById[data.knight.player], data.knight.level, data.knight.active);
+	}
 	if (data.hasOwnProperty("port")) {
 		switch (data.port._resource) {
 			case "BRICK":
