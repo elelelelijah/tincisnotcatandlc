@@ -193,6 +193,26 @@
 							<img src="images/icon-brick.svg" alt="Brick">
 						</div>
 		    		</li>
+<li class="list-group-item ck-build-option hidden">
+				    	<input type="button" class="btn btn-default build-btn" id="activate-knight-btn" value="Activate Knight">
+				    	<br>
+				    	<span>1</span>
+				    	<div class="circle build-circle wheat-color">
+							<img src="images/icon-wheat.svg" alt="Wheat">
+						</div>
+		    		</li>
+		    		<li class="list-group-item ck-build-option hidden">
+				    	<input type="button" class="btn btn-default build-btn" id="promote-knight-btn" value="Promote Knight" title="Basic to Strong: 1 sheep + 1 ore. Strong to Mighty: 2 sheep + 2 ore, and needs Politics level 3.">
+				    	<br>
+				    	<span>1</span>
+				    	<div class="circle build-circle ore-color">
+							<img src="images/icon-ore.svg" alt="Ore">
+						</div>
+						<span>1</span>
+				    	<div class="circle build-circle sheep-color">
+							<img src="images/icon-sheep.svg" alt="Sheep">
+						</div>
+		    		</li>
 		    		<li class="list-group-item ck-build-option hidden">
 				    	<h5 style="margin-bottom:5px"><strong>City Improvements</strong></h5>
 				    	<input type="button" class="btn btn-info btn-xs ck-improve-btn" id="improve-trade-btn" value="Trade" onclick="sendImproveCityTrackAction('TRADE')">
