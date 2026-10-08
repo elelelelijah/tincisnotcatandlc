@@ -1366,7 +1366,7 @@ function exitRemoveRoadMode() {
 var inPlaceKnightMode = false;
 function enterPlaceKnightMode() {
 	inPlaceKnightMode = true;
-	addMessage("Click on an intersection adjacent to your city to place a knight.");
+	addMessage("Click on an intersection adjacent to one of your roads to place a knight.");
 	$("#place-knight-btn").removeClass("btn-default").addClass("btn-danger").val("Cancel Build");
 	
 	for (var i = 0; i < board.intersections.length; i++) {
@@ -1379,13 +1379,7 @@ function enterPlaceKnightMode() {
 
 function exitPlaceKnightMode() {
 	inPlaceKnightMode = false;
-	var btnElement = $("#place-knight-btn");
-	btnElement.off("click", enterPlaceKnightMode);
-	btnElement.click(exitPlaceKnightMode);
-
-	btnElement.removeClass("btn-danger");
-	btnElement.addClass("btn-default");
-	btnElement.val("Place Knight");
+	$("#place-knight-btn").removeClass("btn-danger").addClass("btn-default").val("Place Knight");
 	for (var i = 0; i < board.intersections.length; i++) {
 		if (board.intersections[i].highlighted) {
 			board.intersections[i].unHighlight();
