@@ -209,7 +209,11 @@ Intersection.prototype.createIntersectionClickHandler = function () {
 		} else if (that.building === BUILDING.SETTLEMENT) {
 			sendBuildCityAction(that.intersectCoordinates);
 			exitBuildMode();
-		} else if (that.building === BUILDING.KNIGHT) {
+		}
+		else if (that.building === BUILDING.CITY && inCityWallMode) {
+			sendBuildCityWallAction(that.intersectCoordinates);
+			exitCityWallMode();}
+		else if (that.building === BUILDING.KNIGHT) {
 			// Handle knight clicks (activate, promote, displace?)
 			// For now, maybe just log or handle elsewhere. 
 			// Usually handled by specific modes (activate/promote buttons then click knight).
