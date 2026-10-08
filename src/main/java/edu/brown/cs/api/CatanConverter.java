@@ -320,11 +320,13 @@ public class CatanConverter {
   private static class IntersectionRaw {
 
     private final BuildingRaw building;
+     private final KnightRaw knight; // null (omitted from JSON) if no knight
     private final Port port;
     private final IntersectionCoordinate coordinate;
     private final boolean canBuildSettlement;
 
-    IntersectionRaw(Intersection i, Referee ref, int playerID, String metropolis) {
+    IntersectionRaw(Intersection i, Referee ref, int playerID, String metropolis, KnightPiece knightPiece) {
+      knight = knightPiece != null ? new KnightRaw(knightPiece) : null;
       building = i.getBuilding() != null ? new BuildingRaw(i.getBuilding(), metropolis)
           : null;
       port = i.getPort();
