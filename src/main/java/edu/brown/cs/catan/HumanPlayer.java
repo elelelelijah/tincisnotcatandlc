@@ -72,7 +72,7 @@ public class HumanPlayer implements Player {
     // Initialize Cities & Knights state:
     this.commodities = new HashMap<>();
     for (Commodity c : Commodity.values()) {
-      commodities.put(c, 0.0);
+      commodities.put(c, 20.0);
     }
     this.cityImprovement = new CityImprovement();
     this.knights = new ArrayList<>();
