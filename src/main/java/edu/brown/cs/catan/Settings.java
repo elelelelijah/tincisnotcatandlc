@@ -78,7 +78,7 @@ public abstract class Settings {
   public static final int CITY_POINT_VAL = 2;
   public static final int LONGEST_ROAD_POINT_VAL = 2;
   public static final int LARGEST_ARMY_POINT_VAL = 2;
-  public static final double DROP_CARDS_THRESH = 7;
+  public static final double DROP_CARDS_THRESH = 8;
   public static final int WINNING_POINT_COUNT = 10;
 
   // --- Cities & Knights Constants ---
