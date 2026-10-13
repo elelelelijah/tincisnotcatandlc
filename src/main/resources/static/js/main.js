@@ -1562,7 +1562,7 @@ function enterRelocateKnightMode(options) {
 		//var c = board.intersections[i].intersectCoordinates;
 		//if (wanted[coordKey([c.coord1, c.coord2, c.coord3])]) {
 			board.intersections[i].highlight();
-		}
+		
 	}
 }
  
