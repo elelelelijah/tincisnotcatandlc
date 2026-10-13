@@ -40,6 +40,11 @@ public class EndTurn implements Action {
       return ImmutableMap.of(_player.getID(), new ActionResponse(false,
           "It is not your turn.", null));
     }
+     // Knights recruited, promoted or activated this turn may act from the
+    // owner's next turn onwards.
+    for (KnightPiece k : _player.getKnights()) {
+      k.clearRestriction();
+    }
     _ref.startNextTurn();
     Player nextPlayer = _ref.currentPlayer();
     if (nextPlayer.getDevCards().get(DevelopmentCard.KNIGHT) != 0) {
