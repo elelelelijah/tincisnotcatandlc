@@ -213,6 +213,10 @@
 							<img src="images/icon-sheep.svg" alt="Sheep">
 						</div>
 		    		</li>
+<li class="list-group-item ck-build-option hidden">
+				    	<input type="button" class="btn btn-default build-btn" id="move-knight-btn" value="Move / Displace Knight" title="Move an active knight along your roads, or displace a weaker opponent knight. Free.">
+		    		</li>
+
 		    		<li class="list-group-item ck-build-option hidden">
 				    	<h5 style="margin-bottom:5px"><strong>City Improvements</strong></h5>
 				    	<input type="button" class="btn btn-info btn-xs ck-improve-btn" id="improve-trade-btn" value="Trade" onclick="sendImproveCityTrackAction('TRADE')">
