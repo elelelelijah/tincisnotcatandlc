@@ -3,7 +3,7 @@ package edu.brown.cs.api;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonSyntaxException;
-
+import edu.brown.cs.actions.MoveKnight;
 import edu.brown.cs.actions.Action;
 import edu.brown.cs.actions.ActivateKnight;
 import edu.brown.cs.actions.BuildCity;
