@@ -1543,28 +1543,62 @@ function handleMoveKnightClick(inter) {
  * empty intersections the server says it can move to.
  */
 var inRelocateKnightMode = false;
+ // Key for coordinates the client has already parsed (x, y, z fields).
+function parsedHexKey(h) {
+	return h.x + "," + h.y + "," + h.z;
+}
  
+// Key for a raw intersection coordinate as sent by the server. It is run
+// through parseHexCoordinates, exactly like parseIntersection does for the
+// board, so it matches no matter how the server names the raw fields.
+function rawIntersectionKey(raw) {
+	return [parsedHexKey(parseHexCoordinates(raw.coord1)),
+		parsedHexKey(parseHexCoordinates(raw.coord2)),
+		parsedHexKey(parseHexCoordinates(raw.coord3))].sort().join("|");
+}
+ 
+function enterRelocateKnightMode(options) {
+	inRelocateKnightMode = true;
+	var wanted = {};
+	for (var k = 0; k < (options || []).length; k++) {
+		wanted[rawIntersectionKey(options[k])] = true;
+	}
+	var matched = 0;
+	for (var i = 0; i < board.intersections.length; i++) {
+		var c = board.intersections[i].intersectCoordinates;
+		var key = [parsedHexKey(c.coord1), parsedHexKey(c.coord2), parsedHexKey(c.coord3)].sort().join("|");
+		if (wanted[key]) {
+			board.intersections[i].highlight();
+			matched++;
+		}
+	}
+	if (matched === 0) {
+		console.warn("Relocate knight: none of the server's options matched a board intersection.",
+			"options:", options, "example intersection:", board.intersections[0] && board.intersections[0].intersectCoordinates);
+	}
+}
+
 /*function coordKey(coords) {
 	var parts = [];
 	for (var i = 0; i < coords.length; i++) {
 		parts.push(coords[i].x + "," + coords[i].y + "," + coords[i].z);
 	}
 	return parts.sort().join("|");
-}*/
+}
  
 function enterRelocateKnightMode(options) {
 	inRelocateKnightMode = true;
 	/*var wanted = {};
 	for (var k = 0; k < options.length; k++) {
 		wanted[coordKey([options[k].coord1, options[k].coord2, options[k].coord3])] = true;
-	}*/
+	}
 	for (var i = 0; i < board.intersections.length; i++) {
 		//var c = board.intersections[i].intersectCoordinates;
 		//if (wanted[coordKey([c.coord1, c.coord2, c.coord3])]) {
 			board.intersections[i].highlight();
 		
 	}
-}
+}*/
  
 function exitRelocateKnightMode() {
 	inRelocateKnightMode = false;
