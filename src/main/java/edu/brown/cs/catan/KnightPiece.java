@@ -50,6 +50,7 @@ public class KnightPiece {
   private final int _ownerID;
   private IntersectionCoordinate _position;
   private boolean _usedThisTurn;
+  private boolean _newThisTurn = false;
 private int _restrictedTurn = -1;
   /**
    * Creates a new Basic, inactive knight.
