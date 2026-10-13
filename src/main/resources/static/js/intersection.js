@@ -195,6 +195,17 @@ Intersection.prototype.addKnight = function (player, level, active) {
 Intersection.prototype.createIntersectionClickHandler = function () {
 	var that = this;
 	return function (event) {
+		// Moving / displacing one of my knights (two clicks: knight, then destination)
+		if (inMoveKnightMode) {
+			handleMoveKnightClick(that);
+			return;
+		}
+		// I was displaced: choose where my knight goes
+		if (inRelocateKnightMode) {
+			sendRelocateKnightAction(that.intersectCoordinates);
+			exitRelocateKnightMode();
+			return;
+		}
 		if (that.building === BUILDING.NONE) {
 			if (inPlaceSettlementMode) {
 				sendPlaceSettlementAction(that.intersectCoordinates);
