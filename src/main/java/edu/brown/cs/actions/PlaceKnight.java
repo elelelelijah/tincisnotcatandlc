@@ -101,6 +101,7 @@ public class PlaceKnight implements Action {
     // Place knight
     KnightPiece knight = new KnightPiece(_player.getID(),
         _intersection.getPosition());
+     knight.restrictForTurn(_ref.getTurn().getTurnNum());
     _player.addKnight(knight);
 
     // Response
