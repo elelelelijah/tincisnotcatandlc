@@ -1559,8 +1559,8 @@ function enterRelocateKnightMode(options) {
 		wanted[coordKey([options[k].coord1, options[k].coord2, options[k].coord3])] = true;
 	}
 	for (var i = 0; i < board.intersections.length; i++) {
-		var c = board.intersections[i].intersectCoordinates;
-		if (wanted[coordKey([c.coord1, c.coord2, c.coord3])]) {
+		//var c = board.intersections[i].intersectCoordinates;
+		//if (wanted[coordKey([c.coord1, c.coord2, c.coord3])]) {
 			board.intersections[i].highlight();
 		}
 	}
