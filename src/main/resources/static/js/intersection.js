@@ -34,7 +34,7 @@ function Intersection(coord1, coord2, coord3) {
 	this.player;
 	this.knightLevel = 1;
 	this.knightActive = false;
-
+this.knightCanAct = false;
 	this.port = PORT.NONE;
 
 	this.highlighted = false;
