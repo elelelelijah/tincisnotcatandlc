@@ -305,17 +305,19 @@ public class CatanConverter {
 
   }
   // C&K: a knight standing on an intersection (level is 1=Basic .. 3=Mighty)
-  private static class KnightRaw {
-    private final int player;
-    private final int level;
-    private final boolean active;
- 
-    KnightRaw(KnightPiece k) {
-      player = k.getOwnerID();
-      level = k.getStrength();
-      active = k.isActive();
-    }
+ private static class KnightRaw {
+  private final int player;
+  private final int level;
+  private final boolean active;
+  private final boolean canAct;
+
+  KnightRaw(KnightPiece k, int turn) {
+    player = k.getOwnerID();
+    level = k.getStrength();
+    active = k.isActive();
+    canAct = k.isActive() && !k.isRestrictedOn(turn);
   }
+}
 
   private static class IntersectionRaw {
 
@@ -326,7 +328,9 @@ public class CatanConverter {
     private final boolean canBuildSettlement;
 
     IntersectionRaw(Intersection i, Referee ref, int playerID, String metropolis, KnightPiece knightPiece) {
-      knight = knightPiece != null ? new KnightRaw(knightPiece) : null;
+      // in IntersectionRaw's constructor:
+knight = knightPiece != null
+    ? new KnightRaw(knightPiece, ref.getTurn().getTurnNum()) : null;
       building = i.getBuilding() != null ? new BuildingRaw(i.getBuilding(), metropolis)
           : null;
       port = i.getPort();
