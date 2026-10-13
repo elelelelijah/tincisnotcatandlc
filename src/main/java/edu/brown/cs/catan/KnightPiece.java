@@ -50,7 +50,7 @@ public class KnightPiece {
   private final int _ownerID;
   private IntersectionCoordinate _position;
   private boolean _usedThisTurn;
-
+private int _restrictedTurn = -1;
   /**
    * Creates a new Basic, inactive knight.
    *
@@ -106,7 +106,32 @@ public class KnightPiece {
     _active = false;
     _usedThisTurn = true;
   }
-
+/**
+   * Relocates this knight WITHOUT changing its active status. Used when an
+   * opponent displaces this knight and its owner moves it to safety.
+   *
+   * @param newPosition
+   *          The new intersection coordinate.
+   */
+  public void relocateTo(IntersectionCoordinate newPosition) {
+    _position = newPosition;
+  }
+   /**
+   * Records that this knight was recruited, promoted or activated on the given
+   * turn, so it cannot perform an action (move / displace) until a later turn.
+   */
+  public void restrictForTurn(int turnNum) {
+    _restrictedTurn = turnNum;
+  }
+ 
+  /**
+   * Returns true if this knight was recruited, promoted or activated on the
+   * given turn and therefore cannot act on it.
+   */
+  public boolean isRestrictedOn(int turnNum) {
+    return _restrictedTurn == turnNum;
+  }
+ 
   /**
    * Returns whether this knight can displace the given opponent knight. A
    * knight can only displace a strictly weaker knight.
