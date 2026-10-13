@@ -1421,8 +1421,8 @@ function exitCKBuildModes() {
 	if (inCityWallMode) exitCityWallMode();
 	if (inActivateKnightMode) exitActivateKnightMode();
 	if (inPromoteKnightMode) exitPromoteKnightMode();
+	if (inMoveKnightMode) exitMoveKnightMode();
 }
- 
 // Build-menu buttons: click once to start, click again to cancel.
 $("#place-knight-btn").click(function () {
 	if (inPlaceKnightMode) {
@@ -1454,6 +1454,123 @@ $("#promote-knight-btn").click(function () {
 		enterPromoteKnightMode();
 	}
 });
+$("#move-knight-btn").click(function () {
+	if (inMoveKnightMode) {
+		exitMoveKnightMode();
+	} else {
+		enterMoveKnightMode();
+	}
+});
+/**
+ * Move / Displace Knight, in two clicks:
+ *   1. click one of your active knights that can act this turn
+ *   2. click where it should go: an empty intersection, or an opponent's
+ *      weaker knight to displace it.
+ * The server checks road connectivity and everything else.
+ */
+var inMoveKnightMode = false;
+var moveKnightStage = 0;
+var moveKnightFrom = null;
+var moveKnightLevel = 0;
+ 
+function unHighlightAllIntersections() {
+	for (var i = 0; i < board.intersections.length; i++) {
+		if (board.intersections[i].highlighted) {
+			board.intersections[i].unHighlight();
+		}
+	}
+}
+ 
+function enterMoveKnightMode() {
+	exitBuildMode();
+	inMoveKnightMode = true;
+	moveKnightStage = 1;
+	moveKnightFrom = null;
+	var count = 0;
+	for (var i = 0; i < board.intersections.length; i++) {
+		var inter = board.intersections[i];
+		if (inter.building === BUILDING.KNIGHT && inter.player.id === playerId
+			&& inter.knightActive && inter.knightCanAct) {
+			inter.highlight();
+			count++;
+		}
+	}
+	if (count === 0) {
+		inMoveKnightMode = false;
+		moveKnightStage = 0;
+		addMessage("You have no active knights that can act this turn.");
+		return;
+	}
+	$("#move-knight-btn").removeClass("btn-default").addClass("btn-danger").val("Cancel");
+	addMessage("Click one of your active knights to move it.");
+}
+ 
+function exitMoveKnightMode() {
+	inMoveKnightMode = false;
+	moveKnightStage = 0;
+	moveKnightFrom = null;
+	$("#move-knight-btn").removeClass("btn-danger").addClass("btn-default").val("Move / Displace Knight");
+	unHighlightAllIntersections();
+}
+ 
+function handleMoveKnightClick(inter) {
+	if (moveKnightStage === 1) {
+		moveKnightFrom = inter.intersectCoordinates;
+		moveKnightLevel = inter.knightLevel;
+		moveKnightStage = 2;
+		unHighlightAllIntersections();
+		for (var i = 0; i < board.intersections.length; i++) {
+			var other = board.intersections[i];
+			if (other === inter) {
+				continue;
+			}
+			if (other.building === BUILDING.NONE) {
+				other.highlight();
+			} else if (other.building === BUILDING.KNIGHT && other.player.id !== playerId
+				&& other.knightLevel < moveKnightLevel) {
+				other.highlight();
+			}
+		}
+		addMessage("Click an empty intersection on your roads, or a weaker opponent knight to displace it.");
+	} else if (moveKnightStage === 2) {
+		sendMoveKnightAction(moveKnightFrom, inter.intersectCoordinates);
+		exitMoveKnightMode();
+	}
+}
+ 
+/**
+ * Relocate Knight (follow-up): one of my knights was displaced. Highlight the
+ * empty intersections the server says it can move to.
+ */
+var inRelocateKnightMode = false;
+ 
+function coordKey(coords) {
+	var parts = [];
+	for (var i = 0; i < coords.length; i++) {
+		parts.push(coords[i].x + "," + coords[i].y + "," + coords[i].z);
+	}
+	return parts.sort().join("|");
+}
+ 
+function enterRelocateKnightMode(options) {
+	inRelocateKnightMode = true;
+	var wanted = {};
+	for (var k = 0; k < options.length; k++) {
+		wanted[coordKey([options[k].coord1, options[k].coord2, options[k].coord3])] = true;
+	}
+	for (var i = 0; i < board.intersections.length; i++) {
+		var c = board.intersections[i].intersectCoordinates;
+		if (wanted[coordKey([c.coord1, c.coord2, c.coord3])]) {
+			board.intersections[i].highlight();
+		}
+	}
+}
+ 
+function exitRelocateKnightMode() {
+	inRelocateKnightMode = false;
+	unHighlightAllIntersections();
+}
+
 /**
  * Activate Knight: enter a mode where the player clicks one of their inactive knights.
  */
