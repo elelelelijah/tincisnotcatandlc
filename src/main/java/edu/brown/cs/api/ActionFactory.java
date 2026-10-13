@@ -139,6 +139,12 @@ public class ActionFactory {
           return new PromoteKnight(_referee, playerID,
               toIntersectionCoordinate(actionJSON.get("coordinate")
                   .getAsJsonObject()));
+             case MoveKnight.ID:
+          return new MoveKnight(_referee, playerID,
+              toIntersectionCoordinate(actionJSON.get("from")
+                  .getAsJsonObject()),
+              toIntersectionCoordinate(actionJSON.get("to")
+                  .getAsJsonObject()));
         case BuildCityWall.ID:
           return new BuildCityWall(_referee, playerID,
               toIntersectionCoordinate(actionJSON.get("coordinate")
