@@ -110,6 +110,7 @@ public class PromoteKnight implements Action {
     // Promote
     KnightLevel oldLevel = target.getLevel();
     target.promote();
+     target.restrictForTurn(_ref.getTurn().getTurnNum());
 
     // Response
     ActionResponse respToPlayer = new ActionResponse(true,
