@@ -1860,27 +1860,36 @@ function exitDeserterTargetMode() {
  * to one of their buildings to place the merchant pawn.
  */
 var inPlaceMerchantMode = false;
-
+var merchantTiles = []; // tiles highlighted by merchant mode, to clean up on exit
+ 
 function enterPlaceMerchantMode() {
 	inPlaceMerchantMode = true;
+	merchantTiles = [];
 	addMessage("Click on a land hex adjacent to your building to place the Merchant.");
-
+ 
 	for (var i = 0; i < board.tiles.length; i++) {
 		var tile = board.tiles[i];
-		if (tile.tileType === TILE_TYPE.SEA || tile.tileType === TILE_TYPE.DESERT) {
+		// Skip sea and desert when the tile-type constants are available.
+		// (If they aren't, the server still rejects invalid hexes.)
+		if (typeof TILE_TYPE !== "undefined"
+			&& (tile.tileType === TILE_TYPE.SEA || tile.tileType === TILE_TYPE.DESERT)) {
 			continue;
 		}
-		// Check if this tile is adjacent to any of our buildings
+		// Is this tile one of the three hexes touching any of our buildings?
+		// NOTE: an intersection's "coordinates" is its center point; the three
+		// adjacent hexes are in "intersectCoordinates".
 		var isAdjacent = false;
-		for (var j = 0; j < board.intersections.length; j++) {
+		for (var j = 0; j < board.intersections.length && !isAdjacent; j++) {
 			var inter = board.intersections[j];
-			if (inter.building && inter.building.owner === playerId) {
-				var coords = inter.coordinates;
-				if ((coords.coord1.x === tile.coordinates.x && coords.coord1.y === tile.coordinates.y && coords.coord1.z === tile.coordinates.z) ||
-					(coords.coord2.x === tile.coordinates.x && coords.coord2.y === tile.coordinates.y && coords.coord2.z === tile.coordinates.z) ||
-					(coords.coord3.x === tile.coordinates.x && coords.coord3.y === tile.coordinates.y && coords.coord3.z === tile.coordinates.z)) {
-					isAdjacent = true;
-					break;
+			if (inter.building !== BUILDING.NONE && inter.player && inter.player.id === playerId) {
+				var hexes = inter.intersectCoordinates;
+				var list = [hexes.coord1, hexes.coord2, hexes.coord3];
+				for (var h = 0; h < list.length; h++) {
+					if (list[h].x === tile.coordinates.x && list[h].y === tile.coordinates.y
+						&& list[h].z === tile.coordinates.z) {
+						isAdjacent = true;
+						break;
+					}
 				}
 			}
 		}
@@ -1889,26 +1898,35 @@ function enterPlaceMerchantMode() {
 			var numberCircle = $("#" + tile.id + "-wrapper .number-circle");
 			numberCircle.addClass("number-circle-highlighted");
 			tile.highlighted = true;
-
-			(function (t) {
-				numberCircle.off("click");
-				numberCircle.click(function (event) {
+			merchantTiles.push(tile);
+ 
+			(function (t, circle) {
+				circle.off("click");
+				circle.click(function (event) {
 					sendPlaceMerchantAction(t.coordinates);
 					exitPlaceMerchantMode();
 				});
-			})(tile);
+			})(tile, numberCircle);
 		}
 	}
+ 
+	if (merchantTiles.length === 0) {
+		console.warn("Place merchant: no tiles were adjacent to your buildings.");
+	}
 }
-
+ 
 function exitPlaceMerchantMode() {
 	inPlaceMerchantMode = false;
-	for (var i = 0; i < board.tiles.length; i++) {
-		if (board.tiles[i].highlighted) {
-			board.tiles[i].unHighlight();
+	for (var i = 0; i < merchantTiles.length; i++) {
+		var t = merchantTiles[i];
+		$("#" + t.id + "-wrapper .number-circle").off("click").removeClass("number-circle-highlighted");
+		if (t.highlighted) {
+			t.unHighlight();
 		}
 	}
+	merchantTiles = [];
 }
+
 
 /**
  * Alchemist: show a modal where the player picks red die (1-6) and white die (1-6).
