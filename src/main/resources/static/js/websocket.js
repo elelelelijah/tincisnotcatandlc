@@ -695,6 +695,10 @@ function handleFollowUp(action) {
 		case "displaceKnight":
 			enterDisplaceKnightMode();
 			break;
+					case "relocateKnight":
+			enterRelocateKnightMode(action.actionData.options);
+			break;
+
 		case "stealProgressCard":
 			enterStealProgressCardModal();
 			break;
