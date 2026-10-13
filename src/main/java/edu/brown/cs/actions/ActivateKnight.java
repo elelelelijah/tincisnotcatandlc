@@ -83,6 +83,7 @@ public class ActivateKnight implements Action {
 
     // Activate
     target.activate();
+    target.restrictForTurn(_ref.getTurn().getTurnNum());
 
     // Response
     ActionResponse respToPlayer = new ActionResponse(true,
