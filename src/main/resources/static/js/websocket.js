@@ -319,6 +319,24 @@ function sendDisplaceKnightAction(coordinate) {
 	};
 	webSocket.send(JSON.stringify(req));
 }
+function sendMoveKnightAction(from, to) {
+	var req = {
+		requestType: "action",
+		action: "moveKnight",
+		from: from,
+		to: to
+	};
+	webSocket.send(JSON.stringify(req));
+}
+function sendRelocateKnightAction(coordinate) {
+	var req = {
+		requestType: "action",
+		action: "relocateKnight",
+		coordinate: coordinate
+	};
+	webSocket.send(JSON.stringify(req));
+}
+ 
 
 function sendStealProgressCardAction(targetPlayer) {
 	var req = {
