@@ -120,18 +120,25 @@ private int _restrictedTurn = -1;
    * Records that this knight was recruited, promoted or activated on the given
    * turn, so it cannot perform an action (move / displace) until a later turn.
    */
-  public void restrictForTurn(int turnNum) {
-    _restrictedTurn = turnNum;
+ public void restrictForTurn(int turnNum) {
+    _newThisTurn = true;
   }
  
   /**
-   * Returns true if this knight was recruited, promoted or activated on the
-   * given turn and therefore cannot act on it.
+   * Returns true if this knight was recruited, promoted or activated during
+   * the current turn and therefore cannot act yet. The turn number argument is
+   * kept for API compatibility and is not used.
    */
   public boolean isRestrictedOn(int turnNum) {
-    return _restrictedTurn == turnNum;
+    return _newThisTurn;
   }
  
+  /**
+   * Lifts the same-turn restriction. Called when the owner ends their turn.
+   */
+  public void clearRestriction() {
+    _newThisTurn = false;
+  }
   /**
    * Returns whether this knight can displace the given opponent knight. A
    * knight can only displace a strictly weaker knight.
