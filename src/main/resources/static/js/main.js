@@ -1544,20 +1544,20 @@ function handleMoveKnightClick(inter) {
  */
 var inRelocateKnightMode = false;
  
-function coordKey(coords) {
+/*function coordKey(coords) {
 	var parts = [];
 	for (var i = 0; i < coords.length; i++) {
 		parts.push(coords[i].x + "," + coords[i].y + "," + coords[i].z);
 	}
 	return parts.sort().join("|");
-}
+}*/
  
 function enterRelocateKnightMode(options) {
 	inRelocateKnightMode = true;
-	var wanted = {};
+	/*var wanted = {};
 	for (var k = 0; k < options.length; k++) {
 		wanted[coordKey([options[k].coord1, options[k].coord2, options[k].coord3])] = true;
-	}
+	}*/
 	for (var i = 0; i < board.intersections.length; i++) {
 		//var c = board.intersections[i].intersectCoordinates;
 		//if (wanted[coordKey([c.coord1, c.coord2, c.coord3])]) {
