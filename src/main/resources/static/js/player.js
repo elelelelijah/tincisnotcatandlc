@@ -230,13 +230,13 @@ function fillPlayerHand(handData) {
 
 	// C&K: Fill commodity cards
 	if (handData.commodities) {
-		$("#paper-number").text(formatNumber(handData.commodities.PAPER || 0));
+		$("#paper-number").text(formatNumber(handData.commodities.paper || 0));
 		player.hand.paper = handData.commodities.PAPER || 0;
 
-		$("#cloth-number").text(formatNumber(handData.commodities.CLOTH || 0));
+		$("#cloth-number").text(formatNumber(handData.commodities.paper || 0));
 		player.hand.cloth = handData.commodities.CLOTH || 0;
 
-		$("#coin-number").text(formatNumber(handData.commodities.COIN || 0));
+		$("#coin-number").text(formatNumber(handData.commodities.paper || 0));
 		player.hand.coin = handData.commodities.COIN || 0;
 
 		$("#ck-commodities-container").removeClass("hidden");
