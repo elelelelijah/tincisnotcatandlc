@@ -80,6 +80,8 @@ public class RollDice implements FollowUpAction {
     int diceRoll = redDie + whiteDie;
     _ref.getGameStats().addRoll(diceRoll);
     Map<Integer, Map<Resource, Integer>> playerResourceCount = new HashMap<>();
+    // C&K: commodities each player gains from this roll (for the message)
+    Map<Integer, Map<Commodity, Integer>> playerCommodityCount = new HashMap<>();
     Map<Integer, ActionResponse> toRet = new HashMap<>();
 
     if (diceRoll != 7) {
@@ -136,6 +138,27 @@ public class RollDice implements FollowUpAction {
                   // City produced 2 resources; convert 1 to commodity
                   p.removeResource(tileRes, 1.0, _ref.getBank());
                   p.addCommodity(commodity, 1.0);
+
+                  // Keep the roll message in step with what the player
+                  // actually receives: one fewer resource, one commodity.
+                  Map<Resource, Integer> gainedRes = playerResourceCount
+                      .get(pid);
+                  if (gainedRes != null && gainedRes.containsKey(tileRes)) {
+                    int left = gainedRes.get(tileRes) - 1;
+                    if (left > 0) {
+                      gainedRes.put(tileRes, left);
+                    } else {
+                      gainedRes.remove(tileRes);
+                    }
+                  }
+                  Map<Commodity, Integer> gainedCom = playerCommodityCount
+                      .get(pid);
+                  if (gainedCom == null) {
+                    gainedCom = new HashMap<>();
+                    playerCommodityCount.put(pid, gainedCom);
+                  }
+                  Integer prev = gainedCom.get(commodity);
+                  gainedCom.put(commodity, prev == null ? 1 : prev + 1);
                 }
               }
             }
@@ -172,6 +195,14 @@ public class RollDice implements FollowUpAction {
             default:
               message.append(".");
               break;
+          }
+        }
+        Map<Commodity, Integer> commodityCount = playerCommodityCount
+            .get(playerID);
+        if (commodityCount != null) {
+          for (Map.Entry<Commodity, Integer> e : commodityCount.entrySet()) {
+            message.append(String.format(", you received %d %s", e.getValue(),
+                String.valueOf(e.getKey()).toLowerCase()));
           }
         }
         message.append(".");
