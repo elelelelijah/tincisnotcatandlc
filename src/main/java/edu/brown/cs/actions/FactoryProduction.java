@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import com.google.gson.JsonPrimitive;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
@@ -107,7 +108,7 @@ public class FactoryProduction implements FollowUpAction {
     json.addProperty("maxCoal", _maxCoal);
     JsonArray units = new JsonArray();
     for (Resource r : _units) {
-      units.add(r.toString());
+     units.add(new JsonPrimitive(r.toString()));// units.add(r.toString());
     }
     json.add("units", units);
     return json;
