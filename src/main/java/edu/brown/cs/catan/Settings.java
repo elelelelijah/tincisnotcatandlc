@@ -134,7 +134,7 @@ public abstract class Settings {
   // Mirrors the starting stock HumanPlayer currently gives every resource for
   // testing (INITIAL_RESOURCES + 25), applied to coal and concrete in Cursed
   // Catan only. Uranium is locked until the Great War, so it starts empty.
-  public final static double CURSED_TEST_STARTING_STOCK = 25.0;
+  public final static double CURSED_TEST_STARTING_STOCK = 0.0;
 
   // --- Cities & Knights Constants ---
 
