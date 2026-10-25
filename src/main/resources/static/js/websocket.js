@@ -256,7 +256,41 @@ function sendMoveRobberAction(coord) {
 		action: "moveRobber",
 		newLocation: coord
 	};
+	// Cursed Catan: optionally spend a Spy Network to ignore fortresses
+	if (typeof spyNetworkSelected === "function" && spyNetworkSelected()) {
+		dropReq.useSpyNetwork = true;
+	}
 	webSocket.send(JSON.stringify(dropReq));
+}
+
+function sendPlayBorderRaidAction() {
+	var playReq = {
+		requestType: "action",
+		action: "playBorderRaid"
+	};
+	webSocket.send(JSON.stringify(playReq));
+}
+
+function sendBorderRaidRoadAction(start, end) {
+	var req = {
+		requestType: "action",
+		action: "borderRaidTarget",
+		type: "road",
+		start: start,
+		end: end
+	};
+	webSocket.send(JSON.stringify(req));
+}
+
+function sendBorderRaidFortressAction(tileCoord, ownerId) {
+	var req = {
+		requestType: "action",
+		action: "borderRaidTarget",
+		type: "fortress",
+		tile: tileCoord,
+		owner: ownerId
+	};
+	webSocket.send(JSON.stringify(req));
 }
 
 function sendTakeCardAction(playerId) {
@@ -793,6 +827,9 @@ function handleFollowUp(action) {
 		case "goldResource":
 			enterGoldModal(action.actionData.count);
 			break;
+		case "borderRaidTarget":
+			enterBorderRaidMode();
+			break;
 		case "factoryProduction":
 			enterFactoryModal(action.actionData.units, action.actionData.maxCoal);
 			break;
@@ -977,7 +1014,7 @@ function handleGetGameState(gameStateData) {
 	// Handle win game
 	if (gameStateData.hasOwnProperty("winner")) {
 		var winner = gameStateData.winner;
-		showWinnerModal(winner);
+		showWinnerModal(winner, gameStateData.winReason);
 	}
 
 	// Handle follow up action

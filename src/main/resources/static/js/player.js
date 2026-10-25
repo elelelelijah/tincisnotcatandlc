@@ -358,6 +358,11 @@ function fillPlayerBuyOptions(handData) {
 		$("#city-build-btn").prop("disabled", true);
 	}
 
+	// Cursed Catan: playable and held development cards
+	if (handData.canBuildFactory !== undefined) {
+		updateCursedCardsUI(handData);
+	}
+
 	// Cursed Catan: factories and capitols
 	if (handData.canBuildFactory !== undefined) {
 		$("#factory-build-btn").prop("disabled", !handData.canBuildFactory);

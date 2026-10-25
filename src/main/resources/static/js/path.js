@@ -122,7 +122,15 @@ Path.prototype.addRoad = function(player) {
 Path.prototype.createPathClickHandler = function() {
 	var that = this;
 	return function(event) {
-		if (inPlaceRoadMode) {
+		if (typeof inRemoveRoadMode !== "undefined" && inRemoveRoadMode) {
+			// Diplomat: remove this road
+			sendRemoveRoadAction(that.originalStart, that.originalEnd);
+			exitRemoveRoadMode();
+		} else if (typeof inBorderRaidMode !== "undefined" && inBorderRaidMode) {
+			// Cursed Catan Border Raid: destroy this opponent road
+			sendBorderRaidRoadAction(that.originalStart, that.originalEnd);
+			exitBorderRaidMode();
+		} else if (inPlaceRoadMode) {
 			sendPlaceRoadAction(that.originalStart, that.originalEnd);
 			exitPlaceRoadMode();
 		} else {

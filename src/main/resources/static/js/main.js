@@ -595,10 +595,11 @@ $("#discard-modal").on("hide.bs.modal", function () {
 // Highlight all tiles on board that robber could be moved to.
 function highlightRobbableTiles() {
 	for (var i = 0; i < board.tiles.length; i++) {
-		if (board.tiles[i].isRobbable) {
+		if (board.tiles[i].isRobbable()) {
 			board.tiles[i].highlight();
 		}
 	}
+	showSpyNetworkOption();
 }
 
 // Exit place robber mode, unhighlighting all highlighted tiles.
@@ -608,6 +609,7 @@ function exitPlaceRobberMode() {
 			board.tiles[i].unHighlight();
 		}
 	}
+	hideSpyNetworkOption();
 }
 
 //////////////////////////////////////////
@@ -1163,14 +1165,17 @@ $("#trade-responses-cancel-trade-btn").click(function (event) {
 /*
  * Show the game won modal.
  * @param winnerId - the id of the winning player
+ * @param winReason - optional: "exodia" when a Cursed Catan player won by holding all of Exodia
  */
-function showWinnerModal(winnerId) {
+function showWinnerModal(winnerId, winReason) {
 	var winner = playersById[winnerId];
 
+	var byExodia = (winReason === "exodia");
+
 	if (playerId === winnerId) {
-		$("#winnerLabel").text("You Won the Game!");
+		$("#winnerLabel").text(byExodia ? "You won with Exodia!" : "You Won the Game!");
 	} else {
-		$("#winnerLabel").text(winner.name + " Won the Game");
+		$("#winnerLabel").text(byExodia ? winner.name + " won with Exodia!" : winner.name + " Won the Game");
 	}
 
 	$("#winner-modal .modal-body").append("<p>The game is over. You can start a new game of Catan from the home screen.</p>");
@@ -1283,6 +1288,7 @@ function revealCursedUI() {
 	$("#cursed-resources-container").removeClass("hidden");
 	$(".cursed-build-option").removeClass("hidden");
 	$(".cursed-trade-option").removeClass("hidden");
+	$(".cursed-card-option").removeClass("hidden");
 	drawIndustryTrack();
 }
 
@@ -1482,7 +1488,7 @@ function enterRemoveRoadMode() {
 
 	for (var i = 0; i < board.paths.length; i++) {
 		var path = board.paths[i];
-		if (path.road !== null && path.road !== undefined) {
+		if (path.containsRoad) {
 			path.highlight();
 		}
 	}
@@ -2390,4 +2396,163 @@ function enterChooseDiceModal() {
 	});
 
 	$modal.modal("show");
+}
+
+
+//////////////////////////////////////////
+// Cursed Catan development cards
+//////////////////////////////////////////
+
+var CURSED_HELD_CARDS = ["Mao Zedong", "Xi Jinping", "Bing Chilling", "$0.50",
+	"Place Where Nothing Happened", "Taiwan", "A Small Amount of Trolling"];
+
+var EXODIA_PIECE_NAMES = ["Right Arm of the Forbidden One", "Left Arm of the Forbidden One",
+	"Right Leg of the Forbidden One", "Left Leg of the Forbidden One", "Exodia the Forbidden One"];
+
+/*
+ * Redraws the Cursed Catan card panel from the hand data: playable cards
+ * (Border Raid, Spy Network), the cards that are only held, social credit and
+ * progress towards Exodia.
+ */
+function updateCursedCardsUI(handData) {
+	var cards = handData.devCards || {};
+	var borderRaids = cards["Border Raid"] || 0;
+	var spyNetworks = cards["Spy Network"] || 0;
+
+	if (playersById[playerId]) {
+		playersById[playerId].hand.spyNetwork = spyNetworks;
+		playersById[playerId].hand.borderRaid = borderRaids;
+	}
+
+	var playable = $("#cursed-playable-cards").empty();
+	if (borderRaids > 0) {
+		var raid = $("<span class='cursed-card-chip' id='border-raid-chip'></span>");
+		raid.append($("<strong></strong>").text("Border Raid"));
+		raid.append(document.createTextNode(" \u00d7" + borderRaids));
+		raid.append($("<button type='button' class='btn btn-danger btn-xs' id='border-raid-btn'></button>").text("Play"));
+		playable.append(raid);
+	}
+	if (spyNetworks > 0) {
+		var spy = $("<span class='cursed-card-chip' id='spy-network-chip'></span>");
+		spy.attr("title", "Play it while moving the robber: tick the Spy Network box");
+		spy.append($("<strong></strong>").text("Spy Network"));
+		spy.append(document.createTextNode(" \u00d7" + spyNetworks));
+		playable.append(spy);
+	}
+
+	var held = $("#cursed-held-cards").empty();
+	for (var i = 0; i < CURSED_HELD_CARDS.length; i++) {
+		var n = cards[CURSED_HELD_CARDS[i]] || 0;
+		if (n > 0) {
+			var chip = $("<span class='cursed-card-chip cursed-card-held'></span>");
+			chip.text(CURSED_HELD_CARDS[i] + (n > 1 ? " \u00d7" + n : ""));
+			held.append(chip);
+		}
+	}
+
+	var pieces = 0;
+	for (var j = 0; j < EXODIA_PIECE_NAMES.length; j++) {
+		if ((cards[EXODIA_PIECE_NAMES[j]] || 0) > 0) {
+			pieces++;
+			var piece = $("<span class='cursed-card-chip cursed-card-held'></span>").text(EXODIA_PIECE_NAMES[j]);
+			held.append(piece);
+		}
+	}
+	$("#exodia-progress").text(pieces + "/5");
+	$("#social-credit-total").text(handData.socialCredit !== undefined ? handData.socialCredit : 0);
+}
+
+$(document).on("click", "#border-raid-btn", function () {
+	sendPlayBorderRaidAction();
+});
+
+/*
+ * Spy Network: while moving the robber, a holder can tick a box to ignore
+ * fortresses. The server checks that the card may be played.
+ */
+function showSpyNetworkOption() {
+	var me = playersById[playerId];
+	if (gameSettings && gameSettings.isCursedCatan && me && me.hand.spyNetwork > 0) {
+		$("#spy-network-option").removeClass("hidden");
+	}
+}
+
+function hideSpyNetworkOption() {
+	$("#spy-network-option").addClass("hidden");
+	$("#spy-network-toggle").prop("checked", false);
+}
+
+function spyNetworkSelected() {
+	return $("#spy-network-toggle").is(":checked");
+}
+
+/*
+ * Border Raid: pick an opponent's road or fortress to destroy. Opponent roads
+ * are highlighted, and so are tiles with an opponent's fortress.
+ */
+var inBorderRaidMode = false;
+
+function opponentFortresses(tile) {
+	var found = [];
+	var structures = tile.structures || [];
+	for (var i = 0; i < structures.length; i++) {
+		if (structures[i].type === "fortress" && structures[i].player !== playerId) {
+			found.push(structures[i]);
+		}
+	}
+	return found;
+}
+
+function enterBorderRaidMode() {
+	exitBorderRaidMode();
+	inBorderRaidMode = true;
+	addMessage("Border Raid: click an opponent's road or fortress to destroy it.");
+
+	for (var i = 0; i < board.paths.length; i++) {
+		var path = board.paths[i];
+		if (path.containsRoad && path.player && path.player.id !== playerId) {
+			path.highlight();
+		}
+	}
+
+	for (var t = 0; t < board.tiles.length; t++) {
+		var tile = board.tiles[t];
+		var targets = opponentFortresses(tile);
+		if (targets.length > 0) {
+			highlightBorderRaidTile(tile, targets);
+		}
+	}
+}
+
+function highlightBorderRaidTile(tile, targets) {
+	var circle = $("#" + tile.id + "-wrapper .number-circle");
+	circle.addClass("number-circle-highlighted border-raid-tile");
+	circle.off("click.borderRaid").on("click.borderRaid", function () {
+		var chosen = targets[0];
+		if (targets.length > 1) {
+			chosen = null;
+			for (var i = 0; i < targets.length && chosen === null; i++) {
+				var owner = playersById[targets[i].player];
+				if (window.confirm("Destroy " + (owner ? owner.name : "this player") + "'s fortress?")) {
+					chosen = targets[i];
+				}
+			}
+			if (chosen === null) {
+				return;
+			}
+		}
+		sendBorderRaidFortressAction(tile.coordinates, chosen.player);
+		exitBorderRaidMode();
+	});
+}
+
+function exitBorderRaidMode() {
+	inBorderRaidMode = false;
+	for (var i = 0; i < board.paths.length; i++) {
+		if (board.paths[i].highlighted) {
+			board.paths[i].unHighlight();
+		}
+	}
+	$(".border-raid-tile").off("click.borderRaid")
+		.removeClass("number-circle-highlighted border-raid-tile");
 }
