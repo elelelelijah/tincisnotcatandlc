@@ -741,6 +741,15 @@
 				</li>
 			</ul>
             
+			<!-- Cursed Catan development cards -->
+			<div id="cursed-cards-panel" class="col-xs-12 cursed-card-option hidden">
+				<span class="cursed-panel-label">Cursed cards:</span>
+				<span id="cursed-playable-cards"></span>
+				<span id="cursed-held-cards"></span>
+				<span class="cursed-panel-stat">Social credit: <strong id="social-credit-total">0</strong></span>
+				<span class="cursed-panel-stat">Exodia: <strong id="exodia-progress">0/5</strong></span>
+			</div>
+
 			<!-- C&K Progress Cards -->
 			<div id="ck-progress-cards-panel" class="col-xs-12 hidden" style="margin-top: 5px; padding: 5px; border-top: 1px solid #ddd;">
                 <span style="font-weight: bold; margin-right: 5px;">Progress:</span>
@@ -749,6 +758,11 @@
 		</div>
 	</div>
 	<div class="col-xs-3"></div>
+</div>
+
+<!-- Cursed Catan: shown while moving the robber if you hold a Spy Network -->
+<div id="spy-network-option" class="hidden">
+	<label><input type="checkbox" id="spy-network-toggle"> Use Spy Network (ignore fortresses)</label>
 </div>
 
 <!-- Modals -->
@@ -959,6 +973,22 @@
 				    		<input type="number" class="form-control yop-number" min="0" max="2" res="sheep">
 				    	</div>
 				    </div>
+				    <div class="yop-resource-container cursed-trade-option hidden">
+		       			<div class="circle yop-circle coal-color">
+							<img src="images/icon-coal.svg" alt="Coal">
+						</div>
+						<div class="text-center">
+				    		<input type="number" class="form-control yop-number" min="0" max="2" res="coal">
+				    	</div>
+				    </div>
+				    <div class="yop-resource-container cursed-trade-option hidden">
+		       			<div class="circle yop-circle concrete-color">
+							<img src="images/icon-concrete.svg" alt="Concrete">
+						</div>
+						<div class="text-center">
+				    		<input type="number" class="form-control yop-number" min="0" max="2" res="concrete">
+				    	</div>
+				    </div>
 			    </div>
       		</div>
       		<div class="modal-footer">
@@ -1002,6 +1032,16 @@
 					<div class="circle monopoly-circle-container" res="sheep">
 	      				<div class="circle monopoly-circle sheep-color pointer">
 							<img src="images/icon-sheep.svg" alt="Sheep">
+						</div>
+					</div>
+					<div class="circle monopoly-circle-container cursed-trade-option hidden" res="coal">
+	      				<div class="circle monopoly-circle coal-color pointer">
+							<img src="images/icon-coal.svg" alt="Coal">
+						</div>
+					</div>
+					<div class="circle monopoly-circle-container cursed-trade-option hidden" res="concrete">
+	      				<div class="circle monopoly-circle concrete-color pointer">
+							<img src="images/icon-concrete.svg" alt="Concrete">
 						</div>
 					</div>
       			</div>
