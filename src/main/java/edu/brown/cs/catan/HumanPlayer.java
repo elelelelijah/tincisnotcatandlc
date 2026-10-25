@@ -92,7 +92,7 @@ public class HumanPlayer implements Player {
         resources.put(r, Settings.INITIAL_RESOURCES
             + (stocked ? Settings.CURSED_TEST_STARTING_STOCK : 0.0));
       } else {
-        resources.put(r, Settings.INITIAL_RESOURCES);
+        resources.put(r, Settings.INITIAL_RESOURCES+25.0);
       }
     }
     // Initialize development card hand:
@@ -103,7 +103,7 @@ public class HumanPlayer implements Player {
     // Initialize Cities & Knights state:
     this.commodities = new HashMap<>();
     for (Commodity c : Commodity.values()) {
-      commodities.put(c,0.0);
+      commodities.put(c, 20.0);
     }
     this.cityImprovement = new CityImprovement();
     this.knights = new ArrayList<>();
@@ -402,6 +402,20 @@ public class HumanPlayer implements Player {
     bank.discardResource(resource, count);
     removeResource(resource, CatanFormats.round(count));
 
+  }
+
+  @Override
+  public void returnRoad() {
+    if (numRoads < Settings.INITIAL_ROADS) {
+      numRoads++;
+    }
+  }
+
+  @Override
+  public void returnFortress() {
+    if (numFortresses > 0) {
+      numFortresses--;
+    }
   }
 
   @Override

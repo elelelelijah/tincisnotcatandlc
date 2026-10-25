@@ -184,6 +184,35 @@ public interface Player {
   }
 
   /**
+   * Total social credit of the development cards this player holds. Only used
+   * to break ties in Cursed Catan.
+   */
+  default int getSocialCredit() {
+    int total = 0;
+    for (Map.Entry<DevelopmentCard, Integer> e : getDevCards().entrySet()) {
+      total += e.getValue() * e.getKey().getSocialCredit();
+    }
+    return total;
+  }
+
+  /**
+   * Gives a road piece back to the player (it was destroyed by a Border Raid).
+   */
+  default void returnRoad() {
+    throw new UnsupportedOperationException(
+        "Not supported for this player type.");
+  }
+
+  /**
+   * Gives a fortress piece back to the player (it was destroyed by a Border
+   * Raid).
+   */
+  default void returnFortress() {
+    throw new UnsupportedOperationException(
+        "Not supported for this player type.");
+  }
+
+  /**
    * Returns the number of fortresses this player has on the board.
    */
   default int numFortresses() {

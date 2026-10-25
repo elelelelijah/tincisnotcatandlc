@@ -165,7 +165,8 @@ public class Turn {
    * @return Whether the player had the development card.
    */
   public boolean hadInitialDevCard(DevelopmentCard dev) {
-    return _initialDevCardHand.get(dev) > 0;
+    Integer held = _initialDevCardHand.get(dev);
+    return held != null && held > 0;
   }
 
   // --- Cities & Knights per-turn flag accessors ---

@@ -122,4 +122,25 @@ public interface Referee {
   default boolean isGreatWarTriggered() {
     return false;
   }
+
+  /**
+   * Whether fortresses are ignored for the robber this turn (the current
+   * player used a Spy Network).
+   */
+  default boolean ignoresFortresses() {
+    return false;
+  }
+
+  /**
+   * Records that the current player used a Spy Network this turn.
+   */
+  default void activateSpyNetwork() {
+  }
+
+  /**
+   * Whether the player holds all five pieces of Exodia (Cursed Catan only).
+   */
+  default boolean holdsExodia(Player player) {
+    return false;
+  }
 }

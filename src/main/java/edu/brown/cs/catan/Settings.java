@@ -103,6 +103,12 @@ public abstract class Settings {
   public final static int CURSED_NUM_CONCRETE_TILE = 2;
   public final static int CURSED_NUM_COAL_TILE = 3;
 
+  // Cursed Catan development deck (44 cards): 5 victory points, 2 road
+  // building, 2 year of plenty and 2 monopoly reuse the NUM_* values above.
+  public final static int CURSED_NUM_KNIGHTS = 16;
+  public final static int CURSED_NUM_SPY_NETWORK = 2;
+  public final static int CURSED_NUM_BORDER_RAID = 3;
+
   // Number chits for the 25 non-desert tiles (2s and 12s are doubled so that
   // Test Sites, which need a 2, a 12 or a desert, have room to go).
   public final static int[] CURSED_ROLL_NUMS = { 2, 2, 3, 3, 4, 4, 4, 5, 5, 5,
@@ -134,7 +140,7 @@ public abstract class Settings {
   // Mirrors the starting stock HumanPlayer currently gives every resource for
   // testing (INITIAL_RESOURCES + 25), applied to coal and concrete in Cursed
   // Catan only. Uranium is locked until the Great War, so it starts empty.
-  public final static double CURSED_TEST_STARTING_STOCK = 0.0;
+  public final static double CURSED_TEST_STARTING_STOCK = 25.0;
 
   // --- Cities & Knights Constants ---
 

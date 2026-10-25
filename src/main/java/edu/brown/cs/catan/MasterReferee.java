@@ -38,6 +38,8 @@ public class MasterReferee implements Referee {
   // been spent during the current turn
   private int _industryTrack = 1;
   private boolean _coalSpentThisTurn = false;
+  // Cursed Catan: the current player used a Spy Network this turn
+  private boolean _spyNetworkActive = false;
   private final Bank _bank;
   private final List<DevelopmentCard> _devCardDeck;
   private final GameSettings _gameSettings;
@@ -181,6 +183,7 @@ public class MasterReferee implements Referee {
 
   @Override
   public void startNextTurn() {
+    _spyNetworkActive = false;
     Player nextPlayer = _players.get(_turnOrder.get((_turn.getTurnNum())
         % _gameSettings.numPlayers));
 
@@ -229,6 +232,9 @@ public class MasterReferee implements Referee {
   }
 
   private List<DevelopmentCard> initializeDevDeck() {
+    if (_gameSettings.isCursedCatan) {
+      return initializeCursedDevDeck();
+    }
     List<DevelopmentCard> toReturn = new ArrayList<>();
     for (int i = 0; i < Settings.NUM_KNIGHTS; i++) {
       toReturn.add(DevelopmentCard.KNIGHT);
@@ -247,6 +253,68 @@ public class MasterReferee implements Referee {
     }
     Collections.shuffle(toReturn);
     return toReturn;
+  }
+
+  /**
+   * The 44-card Cursed Catan development deck: 16 Knights, 5 Victory Points,
+   * 2 each of Road Building, Year of Plenty, Monopoly and Spy Network, 3
+   * Border Raids, the seven held cards and the five pieces of Exodia.
+   */
+  private List<DevelopmentCard> initializeCursedDevDeck() {
+    List<DevelopmentCard> toReturn = new ArrayList<>();
+    addCards(toReturn, DevelopmentCard.KNIGHT, Settings.CURSED_NUM_KNIGHTS);
+    addCards(toReturn, DevelopmentCard.POINT, Settings.NUM_POINTS);
+    addCards(toReturn, DevelopmentCard.ROAD_BUILDING, Settings.NUM_ROADBUILDING);
+    addCards(toReturn, DevelopmentCard.YEAR_OF_PLENTY, Settings.NUM_YOP);
+    addCards(toReturn, DevelopmentCard.MONOPOLY, Settings.NUM_MONOPOLY);
+    addCards(toReturn, DevelopmentCard.SPY_NETWORK,
+        Settings.CURSED_NUM_SPY_NETWORK);
+    addCards(toReturn, DevelopmentCard.BORDER_RAID,
+        Settings.CURSED_NUM_BORDER_RAID);
+    toReturn.add(DevelopmentCard.MAO_ZEDONG);
+    toReturn.add(DevelopmentCard.XI_JINPING);
+    toReturn.add(DevelopmentCard.BING_CHILLING);
+    toReturn.add(DevelopmentCard.HALF_DOLLAR);
+    toReturn.add(DevelopmentCard.NOTHING_HAPPENED);
+    toReturn.add(DevelopmentCard.TAIWAN);
+    toReturn.add(DevelopmentCard.TROLLING);
+    toReturn.addAll(DevelopmentCard.EXODIA_PIECES);
+    Collections.shuffle(toReturn);
+    return toReturn;
+  }
+
+  private static void addCards(List<DevelopmentCard> deck,
+      DevelopmentCard card, int count) {
+    for (int i = 0; i < count; i++) {
+      deck.add(card);
+    }
+  }
+
+  @Override
+  public boolean ignoresFortresses() {
+    return _gameSettings.isCursedCatan && _spyNetworkActive;
+  }
+
+  @Override
+  public void activateSpyNetwork() {
+    if (_gameSettings.isCursedCatan) {
+      _spyNetworkActive = true;
+    }
+  }
+
+  @Override
+  public boolean holdsExodia(Player player) {
+    if (!_gameSettings.isCursedCatan || player == null) {
+      return false;
+    }
+    Map<DevelopmentCard, Integer> hand = player.getDevCards();
+    for (DevelopmentCard piece : DevelopmentCard.EXODIA_PIECES) {
+      Integer held = hand.get(piece);
+      if (held == null || held < 1) {
+        return false;
+      }
+    }
+    return true;
   }
 
   @Override
@@ -439,6 +507,12 @@ public class MasterReferee implements Referee {
 
   @Override
   public Player getWinner() {
+    // Cursed Catan: holding all five pieces of Exodia wins on the spot
+    for (Player p : _players.values()) {
+      if (holdsExodia(p)) {
+        return p;
+      }
+    }
     for (Player p : _players.values()) {
       if (getNumTotalPoints(p.getID()) >= _gameSettings.winningPointCount) {
         return p;
