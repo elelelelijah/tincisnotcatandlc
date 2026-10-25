@@ -64,6 +64,15 @@ public class PlayYearOfPlenty implements Action {
               "You cannot play a development card on the turn you bought it",
               null));
     }
+    for (Map.Entry<Resource, Double> e : _resources.entrySet()) {
+      if (e.getValue() > 0.0) {
+        String problem = CatanFormats.pickLockMessage(_ref, e.getKey());
+        if (problem != null) {
+          return ImmutableMap.of(_player.getID(), new ActionResponse(false,
+              problem, null));
+        }
+      }
+    }
     double resCount = 0.0;
     for (Double count : _resources.values()) {
       resCount += count;

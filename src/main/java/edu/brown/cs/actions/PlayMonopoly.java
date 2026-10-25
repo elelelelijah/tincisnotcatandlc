@@ -51,6 +51,11 @@ public class PlayMonopoly implements Action {
               "You cannot play a development card on the turn you bought it",
               null));
     }
+    String problem = CatanFormats.pickLockMessage(_ref, _res);
+    if (problem != null) {
+      return ImmutableMap.of(_player.getID(), new ActionResponse(false,
+          problem, null));
+    }
     try {
       _player.playDevelopmentCard(DevelopmentCard.MONOPOLY);
     } catch (IllegalArgumentException e) {

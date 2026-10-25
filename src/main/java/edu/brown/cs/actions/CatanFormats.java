@@ -70,4 +70,27 @@ public abstract class CatanFormats {
     return null;
   }
 
+  /**
+   * Checks a resource chosen with Year of Plenty or Monopoly. Coal and concrete
+   * can be picked in Cursed Catan; uranium only once the Great War has begun.
+   *
+   * @param ref
+   *          The referee.
+   * @param res
+   *          The resource that was chosen.
+   * @return An error message, or null when the resource may be chosen.
+   */
+  public static String pickLockMessage(Referee ref, Resource res) {
+    if (res == null || res == Resource.WILDCARD) {
+      return "Please choose a real resource.";
+    }
+    if (res.isCursedOnly() && !ref.getGameSettings().isCursedCatan) {
+      return String.format("%s only exists in Cursed Catan.", res);
+    }
+    if (res == Resource.URANIUM && !ref.isGreatWarTriggered()) {
+      return "Uranium cannot be chosen until the Great War begins.";
+    }
+    return null;
+  }
+
 }
