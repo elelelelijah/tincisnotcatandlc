@@ -194,4 +194,88 @@ public interface Referee {
   default Player getDrawWinner() {
     return null;
   }
+
+  // ------------------------------------------------------------ Great War
+
+  /**
+   * Whether the Great War is on (Cursed Catan): it begins when the Industry
+   * track reaches its end.
+   */
+  default boolean isWarActive() {
+    return false;
+  }
+
+  /**
+   * The war's state, or null when there is no war.
+   */
+  default WarState getWarState() {
+    return null;
+  }
+
+  /**
+   * The faction a player fights for, or null outside the war.
+   */
+  default Faction getFaction(int playerID) {
+    return null;
+  }
+
+  /**
+   * Follow-ups that every player has to answer when the war has just begun:
+   * first exchanging coal, then deploying forces. The list is handed over once;
+   * each entry is a group that has to be finished before the next one starts.
+   */
+  default java.util.List<java.util.Collection<edu.brown.cs.actions.FollowUpAction>> takeWarStartFollowUps() {
+    return java.util.Collections.emptyList();
+  }
+
+  /**
+   * How many units of each kind the player still has to deploy.
+   */
+  default java.util.Map<UnitType, Integer> getUnitsToDeploy(int playerID) {
+    return java.util.Collections.emptyMap();
+  }
+
+  /**
+   * The player has placed all of their starting forces.
+   */
+  default void markDeployed(int playerID) {
+  }
+
+  /**
+   * Whether the player has been eliminated from the war.
+   */
+  default boolean isEliminated(int playerID) {
+    return false;
+  }
+
+  /**
+   * Eliminates a player (they forfeit, or have nothing left in the war).
+   */
+  default void eliminate(int playerID) {
+  }
+
+  /**
+   * Whether the player is under Sanctions and may not trade by sea.
+   */
+  default boolean isSanctioned(int playerID) {
+    return false;
+  }
+
+  /**
+   * Launches an Atomic Bomb at a tile (Cursed Catan, Great War).
+   *
+   * @param playerID
+   *          The player launching it.
+   * @param tile
+   *          The target tile.
+   * @param winterDie
+   *          What the Nuclear Winter die showed.
+   * @param unitDie
+   *          Supplies a roll of a D6 for each unit on the struck tile.
+   * @return A description of what happened.
+   */
+  default String launchBomb(int playerID, edu.brown.cs.board.HexCoordinate tile,
+      int winterDie, java.util.function.IntSupplier unitDie) {
+    throw new UnsupportedOperationException("There is no war.");
+  }
 }

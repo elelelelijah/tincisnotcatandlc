@@ -13,12 +13,24 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
+import java.util.Set;
+import java.util.HashSet;
+import java.util.function.IntSupplier;
 import java.util.function.LongSupplier;
 
+import edu.brown.cs.actions.DeployUnits;
 import edu.brown.cs.actions.FollowUpAction;
+import edu.brown.cs.actions.GoldResource;
 import edu.brown.cs.board.Board;
 import edu.brown.cs.board.HexCoordinate;
+import edu.brown.cs.board.Building;
+import edu.brown.cs.board.Capitol;
+import edu.brown.cs.board.City;
+import edu.brown.cs.board.Factory;
 import edu.brown.cs.board.Intersection;
+import edu.brown.cs.board.Tile;
+import edu.brown.cs.board.TileType;
 import edu.brown.cs.gamestats.CatanStats;
 import edu.brown.cs.gamestats.GameStats;
 
@@ -46,6 +58,13 @@ public class MasterReferee implements Referee {
   private int _longestTurnPlayer = -1;
   private long _longestTurnMillis = 0;
   private String _drawReason = null;
+  // Cursed Catan: the Great War
+  private final Random _random;
+  private WarState _war = null;
+  private boolean _warJustStarted = false;
+  private final Map<Integer, Integer> _coalOwed = new HashMap<>();
+  private final Map<Integer, Map<UnitType, Integer>> _toDeploy = new HashMap<>();
+  private final Set<Integer> _eliminated = new HashSet<>();
   private final Bank _bank;
   private final List<DevelopmentCard> _devCardDeck;
   private final GameSettings _gameSettings;
@@ -94,6 +113,23 @@ public class MasterReferee implements Referee {
    *          Supplies the current time in milliseconds.
    */
   public MasterReferee(GameSettings gameSettings, LongSupplier clock) {
+    this(gameSettings, clock, new Random());
+  }
+
+  /**
+   * Creates a referee with a given clock and source of randomness, so that
+   * tests can make the war's tie-break dice predictable.
+   *
+   * @param gameSettings
+   *          The game settings.
+   * @param clock
+   *          Supplies the current time in milliseconds.
+   * @param random
+   *          Used for the dice that break ties when factions are handed out.
+   */
+  public MasterReferee(GameSettings gameSettings, LongSupplier clock,
+      Random random) {
+    _random = random;
     _clock = clock;
     _gameSettings = gameSettings;
     _board = new Board(_gameSettings);
@@ -205,15 +241,22 @@ public class MasterReferee implements Referee {
   public void startNextTurn() {
     recordLongestTurn();
     _spyNetworkActive = false;
-    Player nextPlayer = _players.get(_turnOrder.get((_turn.getTurnNum())
+    int turnNum = _turn.getTurnNum();
+    Player nextPlayer = _players.get(_turnOrder.get(turnNum
         % _gameSettings.numPlayers));
+    // Eliminated players take no more turns
+    for (int tries = 0; _war != null && tries < _gameSettings.numPlayers
+        && isEliminated(nextPlayer.getID()); tries++) {
+      turnNum++;
+      nextPlayer = _players.get(_turnOrder.get(turnNum
+          % _gameSettings.numPlayers));
+    }
 
     if (_gameStatus == GameStatus.PROGRESS) {
-      _turn = new Turn(_turn.getTurnNum() + 1, nextPlayer.getDevCards(),
-          _clock);
+      _turn = new Turn(turnNum + 1, nextPlayer.getDevCards(), _clock);
       _turn.setTurnPlayerID(nextPlayer.getID());
     } else {
-      _turn = new Turn(_turn.getTurnNum() + 1, Collections.emptyMap(), _clock);
+      _turn = new Turn(turnNum + 1, Collections.emptyMap(), _clock);
     }
     checkBarrenBoard();
   }
@@ -292,7 +335,8 @@ public class MasterReferee implements Referee {
     if (!_gameSettings.isCursedCatan || anyoneHoldsExodia()) {
       return false;
     }
-    return _drawReason != null || playersAtWinningScore().size() >= 2;
+    return _drawReason != null || allEliminated()
+        || playersAtWinningScore().size() >= 2;
   }
 
   @Override
@@ -300,7 +344,10 @@ public class MasterReferee implements Referee {
     if (!isDraw()) {
       return null;
     }
-    return _drawReason != null ? _drawReason
+    if (_drawReason != null) {
+      return _drawReason;
+    }
+    return allEliminated() ? "All players are eliminated"
         : "Two players reached the winning score at the same time";
   }
 
@@ -309,8 +356,8 @@ public class MasterReferee implements Referee {
     if (!isDraw()) {
       return null;
     }
-    Collection<Player> candidates = _drawReason != null ? _players.values()
-        : playersAtWinningScore();
+    Collection<Player> candidates = (_drawReason != null || allEliminated()) ? _players
+        .values() : playersAtWinningScore();
     return breakTie(candidates);
   }
 
@@ -475,6 +522,304 @@ public class MasterReferee implements Referee {
     return true;
   }
 
+  // ------------------------------------------------------------ Great War
+
+  @Override
+  public boolean isWarActive() {
+    return _war != null;
+  }
+
+  @Override
+  public WarState getWarState() {
+    return _war;
+  }
+
+  @Override
+  public Faction getFaction(int playerID) {
+    return _war == null ? null : _war.getFaction(playerID);
+  }
+
+  /**
+   * The Great War begins (Industry track at its end). Plays every Knight, hands
+   * the players to factions, swaps coal tiles for uranium, takes the coal,
+   * removes the robber and works out the forces each player deploys.
+   */
+  private void beginGreatWar() {
+    // 1. Every Knight in hand is played with no effect (Longest Army follows)
+    for (Player p : _players.values()) {
+      int knights = p.getDevCards().get(DevelopmentCard.KNIGHT);
+      for (int i = 0; i < knights; i++) {
+        p.playDevelopmentCard(DevelopmentCard.KNIGHT);
+      }
+    }
+    // 2. Factions by victory point rank; ties are broken by dice
+    List<Player> ranked = FactionAssigner.rank(_players.values(),
+        p -> getNumTotalPoints(p.getID()), _random);
+    _war = new WarState(FactionAssigner.assign(ranked));
+    // 5. Coal tiles become uranium (chits and buildings stay); coal is
+    // discarded, and each coal is worth one resource of choice
+    for (Tile t : _board.getTiles()) {
+      if (t.getType() == TileType.COAL) {
+        t.setType(TileType.URANIUM);
+      }
+    }
+    for (Player p : _players.values()) {
+      int coal = (int) Math.floor(p.getResources().get(Resource.COAL));
+      if (coal > 0) {
+        p.removeResource(Resource.COAL, coal, _bank);
+        _coalOwed.put(p.getID(), coal);
+      }
+    }
+    // 6. No robber in the war
+    _board.removeRobber();
+    // 8. Forces: 1 infantry per city, 1 artillery per factory, both for a
+    // capitol; a player with no city or capitol gets 1 infantry; and 1
+    // infantry per Knight played
+    for (Player p : _players.values()) {
+      int infantry = 0;
+      int artillery = 0;
+      boolean hasCity = false;
+      for (Tile t : _board.getTiles()) {
+        for (Intersection i : t.getIntersections()) {
+          Building b = i.getBuilding();
+          if (b == null || !b.getPlayer().equals(p) || !countedOnce(i, t)) {
+            continue;
+          }
+          if (b instanceof Capitol) {
+            infantry++;
+            artillery++;
+            hasCity = true;
+          } else if (b instanceof City) {
+            infantry++;
+            hasCity = true;
+          } else if (b instanceof Factory) {
+            artillery++;
+          }
+        }
+      }
+      if (!hasCity) {
+        infantry++;
+      }
+      infantry += p.numPlayedKnights();
+      Map<UnitType, Integer> owed = new java.util.EnumMap<>(UnitType.class);
+      owed.put(UnitType.INFANTRY, infantry);
+      if (artillery > 0) {
+        owed.put(UnitType.ARTILLERY, artillery);
+      }
+      _toDeploy.put(p.getID(), owed);
+    }
+    _warJustStarted = true;
+  }
+
+  /**
+   * An intersection touches up to three tiles; count its building only from
+   * the first tile that contains it.
+   */
+  private boolean countedOnce(Intersection i, Tile current) {
+    for (Tile t : _board.getTiles()) {
+      if (t.getIntersections().contains(i)) {
+        return t == current;
+      }
+    }
+    return true;
+  }
+
+  @Override
+  public List<Collection<FollowUpAction>> takeWarStartFollowUps() {
+    List<Collection<FollowUpAction>> groups = new ArrayList<>();
+    if (!_warJustStarted) {
+      return groups;
+    }
+    _warJustStarted = false;
+    Collection<FollowUpAction> coal = new ArrayList<>();
+    for (Map.Entry<Integer, Integer> e : _coalOwed.entrySet()) {
+      coal.add(new GoldResource(e.getKey(), e.getValue(), "Coal exchange"));
+    }
+    _coalOwed.clear();
+    if (!coal.isEmpty()) {
+      groups.add(coal);
+    }
+    Collection<FollowUpAction> deploy = new ArrayList<>();
+    for (Player p : _players.values()) {
+      if (_toDeploy.containsKey(p.getID())) {
+        List<HexCoordinate> valid = new ArrayList<>();
+        for (Tile t : _board.getTiles()) {
+          if (t.getType() != TileType.SEA && DeployUnits.touchesBuildingOf(t, p)) {
+            valid.add(t.getCoordinate());
+          }
+        }
+        deploy.add(new DeployUnits(p.getID(), _toDeploy.get(p.getID()), valid));
+      }
+    }
+    if (!deploy.isEmpty()) {
+      groups.add(deploy);
+    }
+    return groups;
+  }
+
+  @Override
+  public Map<UnitType, Integer> getUnitsToDeploy(int playerID) {
+    Map<UnitType, Integer> owed = _toDeploy.get(playerID);
+    return owed == null ? Collections.<UnitType, Integer> emptyMap()
+        : Collections.unmodifiableMap(owed);
+  }
+
+  @Override
+  public void markDeployed(int playerID) {
+    _toDeploy.remove(playerID);
+  }
+
+  @Override
+  public boolean isSanctioned(int playerID) {
+    return _war != null && _war.getSanctioned() != null
+        && _war.getFaction(playerID) == _war.getSanctioned();
+  }
+
+  // ------------------------------------------------------------ elimination
+
+  /**
+   * A player is still in the war while one of their buildings is standing and
+   * touches a tile that is neither sea, desert nor wasteland.
+   */
+  private boolean hasLivingBuilding(Player player) {
+    for (Tile t : _board.getTiles()) {
+      TileType type = t.getType();
+      if (type == TileType.SEA || type == TileType.DESERT
+          || type == TileType.WASTELAND) {
+        continue;
+      }
+      for (Intersection i : t.getIntersections()) {
+        Building b = i.getBuilding();
+        if (b != null && b.getPlayer().equals(player) && !b.isRuined()) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  @Override
+  public boolean isEliminated(int playerID) {
+    if (_war == null) {
+      return false;
+    }
+    if (_eliminated.contains(playerID)) {
+      return true;
+    }
+    Player p = getPlayerByID(playerID);
+    return p != null && !hasLivingBuilding(p);
+  }
+
+  @Override
+  public void eliminate(int playerID) {
+    if (_war != null) {
+      _eliminated.add(playerID);
+    }
+  }
+
+  private boolean allEliminated() {
+    if (_war == null || _players.isEmpty()) {
+      return false;
+    }
+    for (Player p : _players.values()) {
+      if (!isEliminated(p.getID())) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  // ------------------------------------------------------------ atomic bombs
+
+  @Override
+  public String launchBomb(int playerID, HexCoordinate target, int winterDie,
+      IntSupplier unitDie) {
+    if (_war == null) {
+      throw new IllegalStateException("There is no war.");
+    }
+    Tile struck = _board.getTile(target);
+    if (struck == null || struck.getType() == TileType.SEA) {
+      throw new IllegalArgumentException("Choose a land tile.");
+    }
+    Faction launcher = _war.getFaction(playerID);
+    StringBuilder what = new StringBuilder();
+    boolean uraniumStrike = struck.getType() == TileType.URANIUM;
+
+    // The Nuclear Winter die is rolled first
+    int needed = _war.rollNeededToAdvance();
+    if (needed > 0 && winterDie >= needed) {
+      what.append(arriveOnWinterPosition(_war.advanceNuclearWinter()));
+    }
+    // A strike on a uranium tile moves the track one extra step
+    if (uraniumStrike && _war.getNuclearWinter() < WarState.NUCLEAR_WINTER_LAST) {
+      what.append(arriveOnWinterPosition(_war.advanceNuclearWinter()));
+    }
+
+    // The struck tile becomes desert and loses its chit
+    struck.setType(TileType.DESERT);
+    struck.setRollNumber(0);
+    // Adjacent settlements, cities, factories and capitols are ruined, and
+    // each costs its faction 1 Morale
+    for (Intersection i : struck.getIntersections()) {
+      Building b = i.getBuilding();
+      if (b != null && !b.isRuined()) {
+        b.setRuined(true);
+        _war.changeMorale(_war.getFaction(b.getPlayer().getID()), -1);
+      }
+    }
+    // Every unit on the tile, friendly too, is destroyed on a 4-6
+    for (Faction f : _war.getFactionList()) {
+      for (UnitType type : UnitType.values()) {
+        int units = _war.getUnits(target, f, type);
+        int destroyed = 0;
+        for (int n = 0; n < units; n++) {
+          if (unitDie.getAsInt() >= 4) {
+            destroyed++;
+          }
+        }
+        _war.removeUnit(target, f, type, destroyed);
+      }
+    }
+    // The first faction to launch is sanctioned for the rest of the game
+    if (_war.getSanctioned() == null && launcher != null) {
+      _war.sanction(launcher);
+      what.append(String.format(" %s is under Sanctions: no maritime trading.",
+          launcher));
+    }
+    return what.toString().trim();
+  }
+
+  /**
+   * What happens when the Nuclear Winter token reaches a position.
+   */
+  private String arriveOnWinterPosition(int position) {
+    switch (position) {
+    case 4:
+      convertToDesert(TileType.SHEEP);
+      return String.format(" Nuclear Winter reached %d: all sheep tiles become desert.",
+          position);
+    case 5:
+      convertToDesert(TileType.WHEAT);
+      return String.format(" Nuclear Winter reached %d: all wheat tiles become desert.",
+          position);
+    case WarState.NUCLEAR_WINTER_LAST:
+      declareDraw("The Nuclear Winter track reached its last level");
+      return String.format(" Nuclear Winter reached %d: game over (draw).",
+          position);
+    default:
+      return String.format(" Nuclear Winter reached %d.", position);
+    }
+  }
+
+  private void convertToDesert(TileType from) {
+    for (Tile t : _board.getTiles()) {
+      if (t.getType() == from) {
+        t.setType(TileType.DESERT);
+        t.setRollNumber(0);
+      }
+    }
+  }
+
   @Override
   public int getIndustryTrack() {
     return _gameSettings.isCursedCatan ? _industryTrack : 0;
@@ -489,12 +834,19 @@ public class MasterReferee implements Referee {
 
   @Override
   public boolean advanceIndustryTrack() {
-    if (!_gameSettings.isCursedCatan || !_coalSpentThisTurn) {
+    if (!_gameSettings.isCursedCatan || _war != null) {
+      // There is no Industry track once the war has begun
+      return false;
+    }
+    if (!_coalSpentThisTurn) {
       return false;
     }
     _coalSpentThisTurn = false;
     if (_industryTrack < Settings.INDUSTRY_TRACK_LENGTH) {
       _industryTrack++;
+      if (_industryTrack >= Settings.INDUSTRY_TRACK_LENGTH) {
+        beginGreatWar();
+      }
       return true;
     }
     return false;
@@ -679,6 +1031,20 @@ public class MasterReferee implements Referee {
     if (isDraw()) {
       return getDrawWinner();
     }
+    // Great War: the last player standing wins
+    if (_war != null && _players.size() > 1) {
+      Player survivor = null;
+      int alive = 0;
+      for (Player p : _players.values()) {
+        if (!isEliminated(p.getID())) {
+          alive++;
+          survivor = p;
+        }
+      }
+      if (alive == 1) {
+        return survivor;
+      }
+    }
     for (Player p : _players.values()) {
       if (getNumTotalPoints(p.getID()) >= _gameSettings.winningPointCount) {
         return p;
@@ -794,6 +1160,31 @@ public class MasterReferee implements Referee {
     @Override
     public boolean holdsExodia(Player player) {
       return _referee.holdsExodia(player);
+    }
+
+    @Override
+    public boolean isWarActive() {
+      return _referee.isWarActive();
+    }
+
+    @Override
+    public WarState getWarState() {
+      return _referee.getWarState();
+    }
+
+    @Override
+    public Faction getFaction(int playerID) {
+      return _referee.getFaction(playerID);
+    }
+
+    @Override
+    public boolean isEliminated(int playerID) {
+      return _referee.isEliminated(playerID);
+    }
+
+    @Override
+    public boolean isSanctioned(int playerID) {
+      return _referee.isSanctioned(playerID);
     }
 
     @Override
