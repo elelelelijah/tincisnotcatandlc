@@ -74,6 +74,10 @@ public class CatanConverter {
     private List<Integer> turnOrder;
     private Integer winner;
     private String winReason;
+    private Boolean draw;
+    private String drawReason;
+    private Integer longestTurnPlayer;
+    private Integer longestTurnSeconds;
     private Hand hand;
     private BoardRaw board;
     private int currentTurn;
@@ -106,7 +110,22 @@ public class CatanConverter {
           .getTurnOrder() : null;
       this.winner = ref.getWinner() != null ? ref.getWinner().getID() : null;
       if (ref.getWinner() != null) {
-        this.winReason = ref.holdsExodia(ref.getWinner()) ? "exodia" : "points";
+        if (ref.holdsExodia(ref.getWinner())) {
+          this.winReason = "exodia";
+        } else if (ref.isDraw()) {
+          this.winReason = "draw";
+        } else {
+          this.winReason = "points";
+        }
+      }
+      if (ref.isDraw()) {
+        this.draw = true;
+        this.drawReason = ref.getDrawReason();
+      }
+      if (ref.getGameSettings().isCursedCatan
+          && ref.getLongestTurnPlayer() >= 0) {
+        this.longestTurnPlayer = ref.getLongestTurnPlayer();
+        this.longestTurnSeconds = (int) (ref.getLongestTurnMillis() / 1000);
       }
       this.followUp = ref.getNextFollowUp(playerID) != null ? new FollowUpActionRaw(
           ref.getNextFollowUp(playerID)) : null;
@@ -432,6 +451,7 @@ knight = knightPiece != null
     private Integer numCapitols;
     private Integer numFortresses;
     private Integer numTestSites;
+    private Boolean longestTurn;
 
     public PublicPlayerRaw(Player p, Referee r) {
       name = p.getName();
@@ -452,6 +472,7 @@ knight = knightPiece != null
         numCapitols = p.numCapitols();
         numFortresses = p.numFortresses();
         numTestSites = p.numTestSites();
+        longestTurn = r.getLongestTurnPlayer() == p.getID();
       }
       if (r.getGameSettings().isCitiesAndKnights) {
         numKnights = p.getKnights().size();
