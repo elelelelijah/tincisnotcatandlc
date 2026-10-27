@@ -14,6 +14,7 @@ import edu.brown.cs.catan.Referee;
 import edu.brown.cs.catan.Referee.GameStatus;
 import edu.brown.cs.catan.Resource;
 import edu.brown.cs.catan.Settings;
+import edu.brown.cs.catan.Tech;
 
 /**
  * Cursed Catan: builds a test site on a 2, a 12 or a desert next to one of the
@@ -62,6 +63,10 @@ public class BuildTestSite implements Action {
     if (_ref.getGameStatus() != GameStatus.PROGRESS
         || !_ref.currentPlayer().equals(_player)) {
       return fail("You can only build a test site on your own turn.");
+    }
+    if (_ref.isWarActive()
+        && !_ref.hasTech(_player.getID(), Tech.UNLOCK_TEST_SITE)) {
+      return fail("Your faction has not researched the Test Site yet.");
     }
     if (_tile.getType() == TileType.SEA || !isTestSiteTile(_tile)) {
       return fail("A test site can only go on a 2, a 12 or a desert.");
