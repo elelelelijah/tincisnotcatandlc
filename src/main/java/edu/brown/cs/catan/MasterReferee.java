@@ -13,6 +13,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.LongSupplier;
 
 import edu.brown.cs.actions.FollowUpAction;
 import edu.brown.cs.board.Board;
@@ -40,6 +41,11 @@ public class MasterReferee implements Referee {
   private boolean _coalSpentThisTurn = false;
   // Cursed Catan: the current player used a Spy Network this turn
   private boolean _spyNetworkActive = false;
+  // Cursed Catan: Longest Turn and drawn games
+  private final LongSupplier _clock;
+  private int _longestTurnPlayer = -1;
+  private long _longestTurnMillis = 0;
+  private String _drawReason = null;
   private final Bank _bank;
   private final List<DevelopmentCard> _devCardDeck;
   private final GameSettings _gameSettings;
@@ -75,13 +81,27 @@ public class MasterReferee implements Referee {
    *                     A GameSettings object to use as the gameSettings.
    */
   public MasterReferee(GameSettings gameSettings) {
+    this(gameSettings, System::currentTimeMillis);
+  }
+
+  /**
+   * Creates a referee that reads the time from the given clock, so that tests
+   * can control how long turns take (Longest Turn).
+   *
+   * @param gameSettings
+   *          The game settings.
+   * @param clock
+   *          Supplies the current time in milliseconds.
+   */
+  public MasterReferee(GameSettings gameSettings, LongSupplier clock) {
+    _clock = clock;
     _gameSettings = gameSettings;
     _board = new Board(_gameSettings);
     _players = new HashMap<Integer, Player>();
     _turnOrder = initializeTurnOrder(_gameSettings.numPlayers);
     _bank = initializeBank(_gameSettings.isDynamic);
     _devCardDeck = initializeDevDeck();
-    _turn = new Turn(1, Collections.emptyMap());
+    _turn = new Turn(1, Collections.emptyMap(), _clock);
     _gameStatus = GameStatus.WAITING;
     _setup = new Setup(getSetupOrder());
     _gameStats = CatanStats.getGameStatsObject();
@@ -183,16 +203,154 @@ public class MasterReferee implements Referee {
 
   @Override
   public void startNextTurn() {
+    recordLongestTurn();
     _spyNetworkActive = false;
     Player nextPlayer = _players.get(_turnOrder.get((_turn.getTurnNum())
         % _gameSettings.numPlayers));
 
     if (_gameStatus == GameStatus.PROGRESS) {
-      _turn = new Turn(_turn.getTurnNum() + 1, nextPlayer.getDevCards());
+      _turn = new Turn(_turn.getTurnNum() + 1, nextPlayer.getDevCards(),
+          _clock);
+      _turn.setTurnPlayerID(nextPlayer.getID());
     } else {
-      _turn = new Turn(_turn.getTurnNum() + 1, Collections.emptyMap());
+      _turn = new Turn(_turn.getTurnNum() + 1, Collections.emptyMap(), _clock);
     }
+    checkBarrenBoard();
+  }
 
+  /**
+   * Cursed Catan: when a turn ends, the player who took the longest turn so
+   * far holds the Longest Turn card (-2 VP). A longer turn takes it; a tie
+   * leaves it where it is. Time spent waiting for other players does not
+   * count.
+   */
+  private void recordLongestTurn() {
+    if (!_gameSettings.isCursedCatan || _gameStatus != GameStatus.PROGRESS) {
+      return;
+    }
+    Player ending = currentPlayer();
+    if (ending == null) {
+      return;
+    }
+    _turn.setTurnPlayerID(ending.getID());
+    long active = _turn.getActiveMillis();
+    if (_longestTurnPlayer < 0 || active > _longestTurnMillis) {
+      _longestTurnPlayer = ending.getID();
+      _longestTurnMillis = active;
+    }
+  }
+
+  /**
+   * Cursed Catan: if every land tile is Desert or Wasteland, the game is a
+   * draw.
+   */
+  private void checkBarrenBoard() {
+    if (_gameSettings.isCursedCatan && _gameStatus == GameStatus.PROGRESS
+        && Board.isAllBarren(_board.getTiles())) {
+      declareDraw("Every land tile is Desert or Wasteland");
+    }
+  }
+
+  @Override
+  public int getLongestTurnPlayer() {
+    return _gameSettings.isCursedCatan ? _longestTurnPlayer : -1;
+  }
+
+  @Override
+  public long getLongestTurnMillis() {
+    return _gameSettings.isCursedCatan ? _longestTurnMillis : 0;
+  }
+
+  @Override
+  public void declareDraw(String reason) {
+    if (_gameSettings.isCursedCatan && _drawReason == null) {
+      _drawReason = reason == null ? "The game ended in a draw" : reason;
+    }
+  }
+
+  private boolean anyoneHoldsExodia() {
+    for (Player p : _players.values()) {
+      if (holdsExodia(p)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private List<Player> playersAtWinningScore() {
+    List<Player> atScore = new ArrayList<>();
+    for (Player p : _players.values()) {
+      if (getNumTotalPoints(p.getID()) >= _gameSettings.winningPointCount) {
+        atScore.add(p);
+      }
+    }
+    return atScore;
+  }
+
+  @Override
+  public boolean isDraw() {
+    if (!_gameSettings.isCursedCatan || anyoneHoldsExodia()) {
+      return false;
+    }
+    return _drawReason != null || playersAtWinningScore().size() >= 2;
+  }
+
+  @Override
+  public String getDrawReason() {
+    if (!isDraw()) {
+      return null;
+    }
+    return _drawReason != null ? _drawReason
+        : "Two players reached the winning score at the same time";
+  }
+
+  @Override
+  public Player getDrawWinner() {
+    if (!isDraw()) {
+      return null;
+    }
+    Collection<Player> candidates = _drawReason != null ? _players.values()
+        : playersAtWinningScore();
+    return breakTie(candidates);
+  }
+
+  /**
+   * The draw tie-break: the most victory points wins, then the highest social
+   * credit. If there is still a tie, nobody wins.
+   *
+   * @param candidates
+   *          The players in the running.
+   * @return The winner, or null if nobody wins.
+   */
+  private Player breakTie(Collection<Player> candidates) {
+    List<Player> best = new ArrayList<>();
+    int bestPoints = Integer.MIN_VALUE;
+    for (Player p : candidates) {
+      int points = getNumTotalPoints(p.getID());
+      if (points > bestPoints) {
+        bestPoints = points;
+        best.clear();
+        best.add(p);
+      } else if (points == bestPoints) {
+        best.add(p);
+      }
+    }
+    if (best.size() == 1) {
+      return best.get(0);
+    }
+    List<Player> bestCredit = new ArrayList<>();
+    int credit = Integer.MIN_VALUE;
+    for (Player p : best) {
+      int c = p.getSocialCredit();
+      if (c > credit) {
+        credit = c;
+        bestCredit.clear();
+        bestCredit.add(p);
+      } else if (c == credit) {
+        bestCredit.add(p);
+      }
+    }
+    return bestCredit.size() == 1 ? bestCredit.get(0) : null;
   }
 
   @Override
@@ -461,6 +619,9 @@ public class MasterReferee implements Referee {
     if (_gameSettings.isCursedCatan) {
       cursedPoints += Settings.FACTORY_POINT_VAL * player.numFactories();
       cursedPoints += Settings.CAPITOL_POINT_VAL * player.numCapitols();
+      if (id == _longestTurnPlayer) {
+        cursedPoints -= Settings.CURSED_LONGEST_TURN_PENALTY;
+      }
     }
 
     return settlementPoints + cityPoints + roadArmyPts + ckPoints
@@ -512,6 +673,11 @@ public class MasterReferee implements Referee {
       if (holdsExodia(p)) {
         return p;
       }
+    }
+    // Cursed Catan: a draw (declared, or two players at the winning score at
+    // once) goes to the tie-break; it may leave nobody as the winner
+    if (isDraw()) {
+      return getDrawWinner();
     }
     for (Player p : _players.values()) {
       if (getNumTotalPoints(p.getID()) >= _gameSettings.winningPointCount) {
@@ -592,6 +758,14 @@ public class MasterReferee implements Referee {
   @Override
   public void setGameStatus(GameStatus state) {
     _gameStatus = state;
+    if (state == GameStatus.PROGRESS) {
+      // The first real turn starts now, not when the game was created
+      Player first = currentPlayer();
+      if (first != null) {
+        _turn.setTurnPlayerID(first.getID());
+      }
+      _turn.restartClock();
+    }
   }
 
   @Override
@@ -615,6 +789,41 @@ public class MasterReferee implements Referee {
 
     public ReadOnlyReferee(Referee referee) {
       _referee = referee;
+    }
+
+    @Override
+    public boolean holdsExodia(Player player) {
+      return _referee.holdsExodia(player);
+    }
+
+    @Override
+    public boolean ignoresFortresses() {
+      return _referee.ignoresFortresses();
+    }
+
+    @Override
+    public int getLongestTurnPlayer() {
+      return _referee.getLongestTurnPlayer();
+    }
+
+    @Override
+    public long getLongestTurnMillis() {
+      return _referee.getLongestTurnMillis();
+    }
+
+    @Override
+    public boolean isDraw() {
+      return _referee.isDraw();
+    }
+
+    @Override
+    public String getDrawReason() {
+      return _referee.getDrawReason();
+    }
+
+    @Override
+    public Player getDrawWinner() {
+      return _referee.getDrawWinner();
     }
 
     @Override

@@ -6,6 +6,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.LongSupplier;
 
 import edu.brown.cs.actions.FollowUpAction;
 
@@ -17,7 +18,12 @@ import edu.brown.cs.actions.FollowUpAction;
  */
 public class Turn {
 
-  private final long _timeStarted;
+  private long _timeStarted;
+  private final LongSupplier _clock;
+  // Longest Turn: the turn's player, and the time spent waiting on others
+  private int _turnPlayerID = -1;
+  private long _waitStarted = -1;
+  private long _waitedMillis = 0;
   private boolean _devHasBeenPlayed;
   private final int _turnNum;
   private List<Collection<FollowUpAction>> _followUps;
@@ -37,7 +43,24 @@ public class Turn {
    *          The player's initial development card hand.
    */
   public Turn(int turnNum, Map<DevelopmentCard, Integer> initialDevCardHand) {
-    _timeStarted = System.currentTimeMillis();
+    this(turnNum, initialDevCardHand, System::currentTimeMillis);
+  }
+
+  /**
+   * Creates a Turn that reads the time from the given clock (so that tests can
+   * control how long a turn takes).
+   *
+   * @param turnNum
+   *          The turn number
+   * @param initialDevCardHand
+   *          The player's initial development card hand.
+   * @param clock
+   *          Supplies the current time in milliseconds.
+   */
+  public Turn(int turnNum, Map<DevelopmentCard, Integer> initialDevCardHand,
+      LongSupplier clock) {
+    _clock = clock;
+    _timeStarted = clock.getAsLong();
     _devHasBeenPlayed = false;
     _turnNum = turnNum;
     _followUps = new ArrayList<>();
@@ -51,6 +74,10 @@ public class Turn {
    *          the Turn to copy.
    */
   private Turn(Turn turn) {
+    _clock = turn._clock;
+    _turnPlayerID = turn._turnPlayerID;
+    _waitStarted = turn._waitStarted;
+    _waitedMillis = turn._waitedMillis;
     _timeStarted = turn.getTimeStarted();
     _devHasBeenPlayed = turn.devHasBeenPlayed();
     _turnNum = turn.getTurnNum();
@@ -89,6 +116,7 @@ public class Turn {
       actionsCopy.add(action);
     }
     _followUps.add(actionsCopy);
+    refreshWaiting();
   }
 
   /**
@@ -122,6 +150,7 @@ public class Turn {
     if (curr.isEmpty()) {
       _followUps.remove(curr);
     }
+    refreshWaiting();
   }
 
   /**
@@ -140,8 +169,72 @@ public class Turn {
     return new Turn(this);
   }
 
+  /**
+   * Starts the turn's clock again from now. Used when the game moves from
+   * setup to regular play, so that the time spent in the lobby and in setup
+   * does not count as the first turn.
+   */
+  public void restartClock() {
+    _timeStarted = _clock.getAsLong();
+    _waitedMillis = 0;
+    _waitStarted = -1;
+    refreshWaiting();
+  }
+
   public long getTimeElapsed() {
-    return System.currentTimeMillis() - _timeStarted;
+    return _clock.getAsLong() - _timeStarted;
+  }
+
+  /**
+   * Tells the turn whose turn it is, so that it can tell when that player is
+   * only waiting for somebody else (see {@link #getActiveMillis()}).
+   *
+   * @param playerID
+   *          The player taking this turn.
+   */
+  public void setTurnPlayerID(int playerID) {
+    _turnPlayerID = playerID;
+    refreshWaiting();
+  }
+
+  /**
+   * Whether the player taking the turn is held up by a follow-up that only
+   * other players can answer (for example, others discarding or answering a
+   * trade).
+   */
+  private boolean isWaitingOnOthers() {
+    if (_turnPlayerID < 0 || _followUps.isEmpty()) {
+      return false;
+    }
+    for (FollowUpAction action : _followUps.get(0)) {
+      if (action.getPlayerID() == _turnPlayerID) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private void refreshWaiting() {
+    boolean waiting = isWaitingOnOthers();
+    long now = _clock.getAsLong();
+    if (waiting && _waitStarted < 0) {
+      _waitStarted = now;
+    } else if (!waiting && _waitStarted >= 0) {
+      _waitedMillis += now - _waitStarted;
+      _waitStarted = -1;
+    }
+  }
+
+  /**
+   * How long the turn has taken, not counting the time the player spent
+   * waiting for other players' follow-ups. This is what Longest Turn measures.
+   *
+   * @return The active time of the turn in milliseconds.
+   */
+  public long getActiveMillis() {
+    long now = _clock.getAsLong();
+    long waited = _waitedMillis + (_waitStarted >= 0 ? now - _waitStarted : 0);
+    return Math.max(0, now - _timeStarted - waited);
   }
 
   public long getTimeStarted() {

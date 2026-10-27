@@ -143,4 +143,55 @@ public interface Referee {
   default boolean holdsExodia(Player player) {
     return false;
   }
+
+  /**
+   * The player who has taken the longest turn so far (Cursed Catan), or -1 if
+   * nobody has finished a turn yet.
+   */
+  default int getLongestTurnPlayer() {
+    return -1;
+  }
+
+  /**
+   * How long the longest turn took, in milliseconds.
+   */
+  default long getLongestTurnMillis() {
+    return 0;
+  }
+
+  /**
+   * Declares the game a draw. When it is a draw the player with the most
+   * victory points wins, then the one with the highest social credit; if
+   * there is still a tie nobody wins. Used by the war and by the board
+   * checks.
+   *
+   * @param reason
+   *          Why the game ended in a draw.
+   */
+  default void declareDraw(String reason) {
+  }
+
+  /**
+   * Whether the game has ended in a draw: it was declared, or (Cursed Catan)
+   * two or more players are at the winning score at the same time and nobody
+   * holds Exodia.
+   */
+  default boolean isDraw() {
+    return false;
+  }
+
+  /**
+   * Why the game ended in a draw, or null.
+   */
+  default String getDrawReason() {
+    return null;
+  }
+
+  /**
+   * The winner of a drawn game by the tie-break rules, or null if nobody
+   * wins.
+   */
+  default Player getDrawWinner() {
+    return null;
+  }
 }

@@ -105,6 +105,9 @@ public abstract class Settings {
 
   // Cursed Catan development deck (44 cards): 5 victory points, 2 road
   // building, 2 year of plenty and 2 monopoly reuse the NUM_* values above.
+  // Longest Turn: the player who has taken the longest turn so far loses VP
+  public final static int CURSED_LONGEST_TURN_PENALTY = 2;
+
   public final static int CURSED_NUM_KNIGHTS = 16;
   public final static int CURSED_NUM_SPY_NETWORK = 2;
   public final static int CURSED_NUM_BORDER_RAID = 3;
