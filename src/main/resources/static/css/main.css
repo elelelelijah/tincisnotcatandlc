@@ -843,3 +843,81 @@ body {
 	font-weight: normal;
 	cursor: pointer;
 }
+
+
+/* Cursed Catan: the Great War (placeholder styling) */
+#deploy-panel {
+	position: fixed;
+	top: 70px;
+	left: 50%;
+	transform: translateX(-50%);
+	z-index: 1000;
+	background: #fff;
+	border: 1px solid #888;
+	border-radius: 6px;
+	padding: 8px 14px;
+	box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+	text-align: center;
+	max-width: 420px;
+}
+
+#deploy-panel .btn-unit {
+	margin: 2px;
+}
+
+#deploy-panel .btn-unit.active {
+	background: #333;
+	color: #fff;
+}
+
+.faction-chip {
+	display: inline-block;
+	color: #fff;
+	border-radius: 8px;
+	padding: 0 7px;
+	font-size: 11px;
+	font-weight: bold;
+}
+
+.faction-USA { background: #3b5b92; }
+.faction-Russia { background: #a63232; }
+.faction-China { background: #b8921f; }
+
+.faction-banner {
+	margin: 4px 0;
+	font-weight: bold;
+}
+
+.tile-units {
+	position: absolute;
+	bottom: 9%;
+	left: 0;
+	right: 0;
+	display: flex;
+	justify-content: center;
+	flex-wrap: wrap;
+	gap: 1px;
+	pointer-events: none;
+	z-index: 5;
+}
+
+.tile-units .faction-chip {
+	font-size: 10px;
+	padding: 0 4px;
+	border: 1px solid #222;
+}
+
+#war-panel .nw-space {
+	display: inline-block;
+	width: 26px;
+	height: 22px;
+	line-height: 22px;
+	margin: 1px;
+	text-align: center;
+	font-size: 11px;
+	border: 1px solid #444;
+}
+
+#war-panel .morale-row {
+	margin: 2px 0;
+}
