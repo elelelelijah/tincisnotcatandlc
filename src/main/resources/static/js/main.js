@@ -1167,18 +1167,38 @@ $("#trade-responses-cancel-trade-btn").click(function (event) {
  * @param winnerId - the id of the winning player
  * @param winReason - optional: "exodia" when a Cursed Catan player won by holding all of Exodia
  */
-function showWinnerModal(winnerId, winReason) {
+function showWinnerModal(winnerId, winReason, drawReason) {
 	var winner = playersById[winnerId];
 
 	var byExodia = (winReason === "exodia");
+	var byDraw = (winReason === "draw");
 
 	if (playerId === winnerId) {
-		$("#winnerLabel").text(byExodia ? "You won with Exodia!" : "You Won the Game!");
+		$("#winnerLabel").text(byExodia ? "You won with Exodia!" : (byDraw ? "You won the draw!" : "You Won the Game!"));
 	} else {
-		$("#winnerLabel").text(byExodia ? winner.name + " won with Exodia!" : winner.name + " Won the Game");
+		$("#winnerLabel").text(byExodia ? winner.name + " won with Exodia!"
+			: (byDraw ? winner.name + " won the draw" : winner.name + " Won the Game"));
+	}
+
+	if (byDraw) {
+		$("#winner-modal .modal-body").append($("<p></p>").text((drawReason || "The game ended in a draw") + "."));
+		$("#winner-modal .modal-body").append("<p>In a draw, the most victory points wins, then the highest social credit.</p>");
 	}
 
 	$("#winner-modal .modal-body").append("<p>The game is over. You can start a new game of Catan from the home screen.</p>");
+	$("#winner-modal").modal("show");
+}
+
+/*
+ * Show the modal for a drawn game that nobody won (still tied on victory
+ * points and social credit).
+ * @param drawReason - why the game was drawn
+ */
+function showDrawModal(drawReason) {
+	$("#winnerLabel").text("The game ended in a draw");
+	$("#winner-modal .modal-body").append($("<p></p>").text((drawReason || "The game ended in a draw") + "."));
+	$("#winner-modal .modal-body").append("<p>Victory points and social credit are tied, so nobody wins. "
+		+ "You can start a new game of Catan from the home screen.</p>");
 	$("#winner-modal").modal("show");
 }
 
@@ -1295,6 +1315,9 @@ function revealCursedUI() {
 // Cursed Catan: where the March of Industry stands (set from the game state)
 var industryTrack = 0;
 var greatWarTriggered = false;
+// Cursed Catan: who has taken the longest turn so far (-1 if nobody yet)
+var longestTurnPlayerId = -1;
+var longestTurnSeconds = 0;
 
 /*
  * Shows the 12-space March of Industry in the game stats panel. It advances
@@ -1318,8 +1341,16 @@ function drawIndustryTrack() {
 			+ "border:1px solid #444; background:" + bg + "; color:" + fg + ";'>" + i + "</span>";
 	}
 	html += "</div><p class='text-muted' style='font-size:11px; margin-top:4px;'>Advances at the end of each turn "
-		+ "in which coal was spent.</p></div>";
+		+ "in which coal was spent.</p>";
+	if (longestTurnPlayerId >= 0 && playersById[longestTurnPlayerId]) {
+		html += "<p id='longest-turn-info'><strong>Longest Turn:</strong> <span class='longest-turn-name'></span> ("
+			+ longestTurnSeconds + "s, &minus;2 VP)</p>";
+	}
+	html += "</div>";
 	$("#game-stats-container").append(html);
+	if (longestTurnPlayerId >= 0 && playersById[longestTurnPlayerId]) {
+		$("#industry-track .longest-turn-name").text(playersById[longestTurnPlayerId].name);
+	}
 }
 
 /*

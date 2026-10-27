@@ -905,6 +905,8 @@ function handleGetGameState(gameStateData) {
 
 	// Cursed Catan: the March of Industry
 	industryTrack = gameStateData.industryTrack || 0;
+	longestTurnPlayerId = (gameStateData.longestTurnPlayer !== undefined) ? gameStateData.longestTurnPlayer : -1;
+	longestTurnSeconds = gameStateData.longestTurnSeconds || 0;
 	greatWarTriggered = !!gameStateData.greatWarTriggered;
 	updateUraniumTradeVisibility();
 
@@ -1014,7 +1016,10 @@ function handleGetGameState(gameStateData) {
 	// Handle win game
 	if (gameStateData.hasOwnProperty("winner")) {
 		var winner = gameStateData.winner;
-		showWinnerModal(winner, gameStateData.winReason);
+		showWinnerModal(winner, gameStateData.winReason, gameStateData.drawReason);
+	} else if (gameStateData.draw) {
+		// Cursed Catan: a draw that the tie-break could not settle
+		showDrawModal(gameStateData.drawReason);
 	}
 
 	// Handle follow up action

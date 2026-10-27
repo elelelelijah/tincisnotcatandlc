@@ -35,6 +35,7 @@ function Player(id, name, color) {
 	this.numCapitols = 0;
 	this.numFortresses = 0;
 	this.numTestSites = 0;
+	this.longestTurn = false;
 }
 
 /*
@@ -102,6 +103,11 @@ Player.prototype.addPlayerTab = function () {
 			+ "<img src='images/icon-road-building.svg' alt='Road Building'></h4></div>");
 	}
 
+	// Cursed Catan: Longest Turn (-2 VP)
+	if (this.longestTurn) {
+		tab.append("<div class='longest-turn-banner text-center'><h4>Longest Turn (&minus;2 VP)</h4></div>");
+	}
+
 	// Add largest army banner if applicable (base game only)
 	if (this.largestArmy && !gameSettings.isCitiesAndKnights) {
 		tab.append("<div class='largest-army-banner text-center'><h4>Largest Army"
@@ -140,6 +146,10 @@ Player.prototype.addPlayerTab = function () {
 	var longestRoad = $("#p" + this.id + "-tab .longest-road-banner");
 	longestRoad.css("background-color", "rgba(" + rgb + ",0.4)");
 	longestRoad.css("border-color", "rgba(" + rgb + ",0.6)");
+
+	var longestTurn = $("#p" + this.id + "-tab .longest-turn-banner");
+	longestTurn.css("background-color", "rgba(" + rgb + ",0.4)");
+	longestTurn.css("border-color", "rgba(" + rgb + ",0.6)");
 
 	var largestArmy = $("#p" + this.id + "-tab .largest-army-banner");
 	largestArmy.css("background-color", "rgba(" + rgb + ",0.4)");
@@ -205,6 +215,7 @@ function parsePlayers(playersData) {
 			player.numCapitols = playerData.numCapitols;
 			player.numFortresses = playerData.numFortresses;
 			player.numTestSites = playerData.numTestSites;
+			player.longestTurn = !!playerData.longestTurn;
 		}
 
 		players.push(player);
