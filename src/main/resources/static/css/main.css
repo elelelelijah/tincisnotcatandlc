@@ -200,7 +200,7 @@ body {
 	margin-top: 0px;
 }
 
-.longest-road-banner, .largest-army-banner {
+.longest-road-banner, .largest-army-banner, .longest-turn-banner {
 	padding: 0px;
 	border: 1px solid black;
 	border-radius: 5px;
