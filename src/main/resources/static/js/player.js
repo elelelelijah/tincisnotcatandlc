@@ -36,6 +36,8 @@ function Player(id, name, color) {
 	this.numFortresses = 0;
 	this.numTestSites = 0;
 	this.longestTurn = false;
+	this.faction = null;
+	this.eliminated = false;
 }
 
 /*
@@ -101,6 +103,12 @@ Player.prototype.addPlayerTab = function () {
 	if (this.longestRoad) {
 		tab.append("<div class='longest-road-banner text-center'><h4>Longest Road"
 			+ "<img src='images/icon-road-building.svg' alt='Road Building'></h4></div>");
+	}
+
+	// Cursed Catan: the Great War faction
+	if (this.faction) {
+		tab.append("<div class='faction-banner text-center'><span class='faction-chip faction-" + this.faction + "'>"
+			+ this.faction + "</span>" + (this.eliminated ? " <span class='text-danger'>ELIMINATED</span>" : "") + "</div>");
 	}
 
 	// Cursed Catan: Longest Turn (-2 VP)
@@ -217,6 +225,8 @@ function parsePlayers(playersData) {
 			player.numTestSites = playerData.numTestSites;
 			player.longestTurn = !!playerData.longestTurn;
 		}
+		player.faction = playerData.faction || null;
+		player.eliminated = !!playerData.eliminated;
 
 		players.push(player);
 	}

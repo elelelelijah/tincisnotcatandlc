@@ -1172,12 +1172,15 @@ function showWinnerModal(winnerId, winReason, drawReason) {
 
 	var byExodia = (winReason === "exodia");
 	var byDraw = (winReason === "draw");
+	var bySurvival = (winReason === "survivor");
 
 	if (playerId === winnerId) {
-		$("#winnerLabel").text(byExodia ? "You won with Exodia!" : (byDraw ? "You won the draw!" : "You Won the Game!"));
+		$("#winnerLabel").text(byExodia ? "You won with Exodia!" : (byDraw ? "You won the draw!"
+			: (bySurvival ? "You are the last one standing!" : "You Won the Game!")));
 	} else {
 		$("#winnerLabel").text(byExodia ? winner.name + " won with Exodia!"
-			: (byDraw ? winner.name + " won the draw" : winner.name + " Won the Game"));
+			: (byDraw ? winner.name + " won the draw" : (bySurvival ? winner.name + " is the last one standing"
+				: winner.name + " Won the Game")));
 	}
 
 	if (byDraw) {
@@ -1326,6 +1329,11 @@ var longestTurnSeconds = 0;
  */
 function drawIndustryTrack() {
 	$("#industry-track").remove();
+	if (warData) {
+		// There is no Industry track in the war
+		drawWarPanel();
+		return;
+	}
 	if (!industryTrack) {
 		return;
 	}
@@ -2587,3 +2595,269 @@ function exitBorderRaidMode() {
 	$(".border-raid-tile").off("click.borderRaid")
 		.removeClass("number-circle-highlighted border-raid-tile");
 }
+
+
+//////////////////////////////////////////
+// Cursed Catan: the Great War
+//////////////////////////////////////////
+
+// The war section of the game state, or null in peacetime
+var warData = null;
+
+var NUCLEAR_WINTER_ROLLS = [null, null, "6", "5-6", "4-6", "3-6", "2-6"];
+var NUCLEAR_WINTER_NOTES = {
+	4: "Fallout: sheep tiles become desert",
+	5: "Fallout: wheat tiles become desert",
+	6: "GAME OVER"
+};
+
+function factionChip(name) {
+	return $("<span class='faction-chip'></span>").addClass("faction-" + name).text(name);
+}
+
+/*
+ * Draws the war's panel: factions with their Morale, the Nuclear Winter track
+ * and Sanctions. Replaces the March of Industry strip once the war begins.
+ */
+function drawWarPanel() {
+	$("#war-panel").remove();
+	$("#war-build-note").remove();
+	if (!warData) {
+		return;
+	}
+	var panel = $("<div id='war-panel' style='margin-top:8px;'></div>");
+	panel.append($("<p></p>").append($("<strong></strong>").text("The Great War")).append(" &mdash; you fight for ")
+		.append(factionChip(warData.myFaction)));
+
+	for (var i = 0; i < warData.factions.length; i++) {
+		var f = warData.factions[i];
+		var names = [];
+		for (var j = 0; j < f.players.length; j++) {
+			var pl = playersById[f.players[j]];
+			names.push(pl ? pl.name : "?");
+		}
+		var row = $("<div class='morale-row'></div>");
+		row.append(factionChip(f.name));
+		row.append(document.createTextNode(" Morale " + f.morale + " \u00b7 " + f.numUnits + " units \u00b7 "));
+		row.append($("<span class='text-muted'></span>").text(names.join(", ")));
+		panel.append(row);
+	}
+
+	panel.append($("<p style='margin-top:6px;'></p>").append($("<strong></strong>").text("Nuclear Winter")));
+	var track = $("<div></div>");
+	for (var n = 1; n <= 6; n++) {
+		var state = n === warData.nuclearWinter ? "current" : (n < warData.nuclearWinter ? "past" : "future");
+		var bg = state === "current" ? "#333" : (state === "past" ? "#c58b8b" : "#f3ecd9");
+		var fg = state === "current" ? "#fff" : "#444";
+		var space = $("<span class='nw-space'></span>").css({ background: bg, color: fg }).text(n);
+		if (NUCLEAR_WINTER_NOTES[n]) {
+			space.attr("title", NUCLEAR_WINTER_NOTES[n]);
+		}
+		track.append(space);
+	}
+	panel.append(track);
+	if (warData.nuclearWinterRollNeeded) {
+		panel.append($("<p class='text-muted' style='font-size:11px;'></p>")
+			.text("Each Atomic Bomb: roll " + warData.nuclearWinterRollNeeded + "+ to advance. Position 4: sheep become desert; "
+				+ "5: wheat; 6: the game ends in a draw."));
+	}
+	if (warData.sanctioned) {
+		panel.append($("<p class='text-danger'></p>").text(warData.sanctioned + " is under Sanctions: no maritime trading."));
+	}
+	if (longestTurnPlayerId >= 0 && playersById[longestTurnPlayerId]) {
+		panel.append($("<p id='longest-turn-info'></p>").append($("<strong></strong>").text("Longest Turn: "))
+			.append(document.createTextNode(playersById[longestTurnPlayerId].name + " (" + longestTurnSeconds + "s, \u22122 VP)")));
+	}
+	$("#game-stats-container").append(panel);
+
+	// Normal construction has stopped
+	var note = $("<div id='war-build-note' class='alert alert-warning' style='margin:6px;'></div>")
+		.text("Normal construction has stopped during the Great War. Fortresses and test sites can still be built.");
+	$("#build-tab").prepend(note);
+}
+
+/*
+ * Draws each faction's units on the tiles they stand on.
+ */
+function drawWarUnits() {
+	$(".tile-units").remove();
+	if (!warData) {
+		return;
+	}
+	var byTile = {};
+	for (var i = 0; i < warData.units.length; i++) {
+		var u = warData.units[i];
+		var id = "tile-x-" + u.x + "y-" + u.y + "z-" + u.z;
+		if (!byTile[id]) {
+			byTile[id] = $("<div class='tile-units'></div>");
+		}
+		var text = [];
+		var letters = { infantry: "I", artillery: "A", tank: "T", aircraft: "F" };
+		for (var type in u.units) {
+			if (u.units.hasOwnProperty(type)) {
+				text.push((letters[type] || "?") + u.units[type]);
+			}
+		}
+		byTile[id].append(factionChip(u.faction).attr("title", u.faction + ": " + text.join(" ")).text(u.faction + " " + text.join(" ")));
+	}
+	for (var tileId in byTile) {
+		if (byTile.hasOwnProperty(tileId)) {
+			$("#" + tileId + "-wrapper").append(byTile[tileId]);
+		}
+	}
+}
+
+// ---- Deploying the starting forces
+
+var inDeployMode = false;
+var deployOwed = {};
+var deployTiles = [];
+var deployPlaced = [];
+var deployUnit = null;
+
+function deployRemaining(type) {
+	var left = deployOwed[type] || 0;
+	for (var i = 0; i < deployPlaced.length; i++) {
+		if (deployPlaced[i].unit === type) {
+			left--;
+		}
+	}
+	return left;
+}
+
+function deployAllPlaced() {
+	for (var type in deployOwed) {
+		if (deployOwed.hasOwnProperty(type) && deployRemaining(type) !== 0) {
+			return false;
+		}
+	}
+	return true;
+}
+
+/*
+ * Starts (or, if the state was just refreshed, keeps going with) the
+ * deployment of the starting forces.
+ * @param units - how many of each unit type to place, e.g. {infantry: 2}
+ * @param tiles - the coordinates of the tiles that may be used
+ */
+function enterDeployMode(units, tiles) {
+	var same = inDeployMode && JSON.stringify(units) === JSON.stringify(deployOwed);
+	if (!same) {
+		deployPlaced = [];
+		deployUnit = null;
+	}
+	deployOwed = units || {};
+	deployTiles = tiles || [];
+	inDeployMode = true;
+	redrawDeployPanel();
+	highlightDeployTiles();
+}
+
+function redrawDeployPanel() {
+	var me = warData ? warData.myFaction : "";
+	$("#deploy-faction").empty().append(me ? factionChip(me) : "");
+	var unitsDiv = $("#deploy-units").empty();
+	var first = null;
+	for (var type in deployOwed) {
+		if (!deployOwed.hasOwnProperty(type)) {
+			continue;
+		}
+		var left = deployRemaining(type);
+		if (first === null && left > 0) {
+			first = type;
+		}
+		var btn = $("<button type='button' class='btn btn-default btn-xs btn-unit'></button>")
+			.attr("data-unit", type).text(type + ": " + left + " left");
+		unitsDiv.append(btn);
+	}
+	if (deployUnit === null || deployRemaining(deployUnit) <= 0) {
+		deployUnit = first;
+	}
+	unitsDiv.children().each(function () {
+		$(this).toggleClass("active", $(this).attr("data-unit") === deployUnit);
+	});
+	var placed = $("#deploy-placed").empty();
+	for (var i = 0; i < deployPlaced.length; i++) {
+		var p = deployPlaced[i];
+		placed.append($("<div class='text-muted' style='font-size:12px;'></div>")
+			.text(p.unit + " on " + describeTile(p.tile)));
+	}
+	$("#deploy-confirm-btn").prop("disabled", !deployAllPlaced());
+	$("#deploy-panel").removeClass("hidden");
+}
+
+function describeTile(coord) {
+	for (var i = 0; i < board.tiles.length; i++) {
+		var c = board.tiles[i].coordinates;
+		if (c.x === coord.x && c.y === coord.y && c.z === coord.z) {
+			var t = board.tiles[i];
+			return "the " + (t.number ? t.number : "") + " tile (" + coord.x + "," + coord.y + "," + coord.z + ")";
+		}
+	}
+	return "(" + coord.x + "," + coord.y + "," + coord.z + ")";
+}
+
+function highlightDeployTiles() {
+	$(".deploy-tile").off("click.deploy").removeClass("number-circle-highlighted deploy-tile");
+	for (var i = 0; i < board.tiles.length; i++) {
+		var tile = board.tiles[i];
+		for (var j = 0; j < deployTiles.length; j++) {
+			var c = deployTiles[j];
+			if (tile.coordinates.x === c.x && tile.coordinates.y === c.y && tile.coordinates.z === c.z) {
+				(function (tile) {
+					var circle = $("#" + tile.id + "-wrapper .number-circle");
+					circle.addClass("number-circle-highlighted deploy-tile");
+					circle.off("click.deploy").on("click.deploy", function () {
+						if (deployUnit && deployRemaining(deployUnit) > 0) {
+							deployPlaced.push({ tile: tile.coordinates, unit: deployUnit });
+							redrawDeployPanel();
+						}
+					});
+				})(tile);
+			}
+		}
+	}
+}
+
+function exitDeployMode() {
+	inDeployMode = false;
+	deployPlaced = [];
+	deployUnit = null;
+	$("#deploy-panel").addClass("hidden");
+	$(".deploy-tile").off("click.deploy").removeClass("number-circle-highlighted deploy-tile");
+}
+
+$(document).on("click", "#deploy-units .btn-unit", function () {
+	deployUnit = $(this).attr("data-unit");
+	redrawDeployPanel();
+});
+
+$(document).on("click", "#deploy-undo-btn", function () {
+	deployPlaced.pop();
+	redrawDeployPanel();
+});
+
+$(document).on("click", "#deploy-confirm-btn", function () {
+	if (!deployAllPlaced()) {
+		return;
+	}
+	// Merge placements of the same unit on the same tile
+	var merged = [];
+	for (var i = 0; i < deployPlaced.length; i++) {
+		var p = deployPlaced[i];
+		var found = null;
+		for (var j = 0; j < merged.length; j++) {
+			var m = merged[j];
+			if (m.unit === p.unit && m.tile.x === p.tile.x && m.tile.y === p.tile.y && m.tile.z === p.tile.z) {
+				found = m;
+			}
+		}
+		if (found) {
+			found.count++;
+		} else {
+			merged.push({ tile: p.tile, unit: p.unit, count: 1 });
+		}
+	}
+	sendDeployUnitsAction(merged);
+	exitDeployMode();
+});

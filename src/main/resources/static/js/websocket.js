@@ -263,6 +263,15 @@ function sendMoveRobberAction(coord) {
 	webSocket.send(JSON.stringify(dropReq));
 }
 
+function sendDeployUnitsAction(placements) {
+	var req = {
+		requestType: "action",
+		action: "deployUnits",
+		placements: placements
+	};
+	webSocket.send(JSON.stringify(req));
+}
+
 function sendPlayBorderRaidAction() {
 	var playReq = {
 		requestType: "action",
@@ -827,6 +836,9 @@ function handleFollowUp(action) {
 		case "goldResource":
 			enterGoldModal(action.actionData.count);
 			break;
+		case "deployUnits":
+			enterDeployMode(action.actionData.units, action.actionData.tiles);
+			break;
 		case "borderRaidTarget":
 			enterBorderRaidMode();
 			break;
@@ -905,6 +917,7 @@ function handleGetGameState(gameStateData) {
 
 	// Cursed Catan: the March of Industry
 	industryTrack = gameStateData.industryTrack || 0;
+	warData = gameStateData.war || null;
 	longestTurnPlayerId = (gameStateData.longestTurnPlayer !== undefined) ? gameStateData.longestTurnPlayer : -1;
 	longestTurnSeconds = gameStateData.longestTurnSeconds || 0;
 	greatWarTriggered = !!gameStateData.greatWarTriggered;
@@ -921,6 +934,7 @@ function handleGetGameState(gameStateData) {
 	board = new Board();
 	board.createBoard(gameStateData.board);
 	board.draw();
+	drawWarUnits();
 
 	// C&K: Update Barbarian Track with animation
 	if (gameStateData.barbarianTrack && gameSettings.isCitiesAndKnights) {
