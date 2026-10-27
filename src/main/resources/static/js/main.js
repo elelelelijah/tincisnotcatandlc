@@ -908,7 +908,7 @@ var timeoutInterval;
  * @param disconnectData - data about the users that have disconnected
  */
 function showDisconnectedUsersModal(disconnectData) {
-	clearInterval(timeoutInterval);
+	/*clearInterval(timeoutInterval);
 	timeoutInterval = setInterval(function () {
 		var millisLeft = disconnectData.expiresAt - Date.now();
 		var secondsLeft = Math.round(millisLeft / 1000);
@@ -917,7 +917,7 @@ function showDisconnectedUsersModal(disconnectData) {
 		$("#disconnected-user-time").text(secondsLeft);
 	}, 1000);
 
-	$("#disconnected-user-modal").modal("show");
+	$("#disconnected-user-modal").modal("show");*/
 }
 
 // Hide the disconnected users modal
