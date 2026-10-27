@@ -23,7 +23,7 @@ import edu.brown.cs.catan.Resource;
 public class Tile implements BoardTile {
   private final Collection<Intersection> _intersections;
   private int _rollNum;
-  private final TileType _type;
+  private TileType _type;
   private final HexCoordinate _coordinate;
   private boolean _hasRobber;
   private List<IntersectionCoordinate> _portLocations;
@@ -526,6 +526,17 @@ public class Tile implements BoardTile {
   @Override
   public HexCoordinate getCoordinate() {
     return _coordinate;
+  }
+
+  /**
+   * Changes what kind of tile this is (the war turns coal into uranium and
+   * fallout turns land into desert). The number chit is left alone.
+   *
+   * @param type
+   *          The new type.
+   */
+  public void setType(TileType type) {
+    _type = type;
   }
 
   /**

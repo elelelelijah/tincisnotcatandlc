@@ -612,6 +612,28 @@ public class Board {
   }
 
   /**
+   * Takes the robber off the board (the Great War has no robber).
+   */
+  public void removeRobber() {
+    for (Tile t : _tiles) {
+      t.hasRobber(false);
+    }
+  }
+
+  /**
+   * Puts the robber back on a tile, wherever it was before (used when the war
+   * is over).
+   *
+   * @param coord
+   *          The tile to put it on.
+   */
+  public void placeRobber(HexCoordinate coord) {
+    for (Tile t : _tiles) {
+      t.hasRobber(t.getCoordinate().equals(coord));
+    }
+  }
+
+  /**
    * Moves the robber to a given HexCoord.
    * 
    * @param coord

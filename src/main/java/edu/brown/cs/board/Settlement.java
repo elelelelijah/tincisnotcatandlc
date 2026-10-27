@@ -13,6 +13,18 @@ import edu.brown.cs.catan.Resource;
  *
  */
 public class Settlement implements Building {
+  private boolean _ruined = false;
+
+  @Override
+  public boolean isRuined() {
+    return _ruined;
+  }
+
+  @Override
+  public void setRuined(boolean ruined) {
+    _ruined = ruined;
+  }
+
   private Player _player;
 
   /**
@@ -27,6 +39,10 @@ public class Settlement implements Building {
 
   @Override
   public Map<Integer, Map<Resource, Integer>> collectResource(Resource resource) {
+    if (_ruined) {
+      // A ruin produces nothing until it is rebuilt
+      return new HashMap<Integer, Map<Resource, Integer>>();
+    }
     Map<Resource, Integer> resourceCount = new HashMap<Resource, Integer>();
     resourceCount.put(resource, 1);
     Map<Integer, Map<Resource, Integer>> playerResource = new HashMap<Integer, Map<Resource, Integer>>();

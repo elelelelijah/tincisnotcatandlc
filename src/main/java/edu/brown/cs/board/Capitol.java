@@ -27,6 +27,9 @@ public class Capitol extends City {
 
   @Override
   public Map<Integer, Map<Resource, Integer>> collectResource(Resource resource) {
+    if (isRuined()) {
+      return new HashMap<Integer, Map<Resource, Integer>>();
+    }
     Map<Resource, Integer> resourceCount = new HashMap<Resource, Integer>();
     resourceCount.put(resource, 3);
     Map<Integer, Map<Resource, Integer>> playerResource = new HashMap<Integer, Map<Resource, Integer>>();
