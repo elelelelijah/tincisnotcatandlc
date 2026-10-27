@@ -20,6 +20,10 @@ import edu.brown.cs.actions.EndTurn;
 import edu.brown.cs.actions.FollowUpAction;
 import edu.brown.cs.actions.ImproveCityTrack;
 import edu.brown.cs.actions.PlaceKnight;
+import edu.brown.cs.actions.BuyBomb;
+import edu.brown.cs.actions.Forfeit;
+import edu.brown.cs.actions.LaunchBomb;
+import edu.brown.cs.actions.Research;
 import edu.brown.cs.actions.PlayBorderRaid;
 import edu.brown.cs.actions.PlayKnight;
 import edu.brown.cs.actions.PlayMonopoly;
@@ -123,6 +127,14 @@ public class ActionFactory {
           return new PlayKnight(_referee, playerID);
         case PlayBorderRaid.ID:
           return new PlayBorderRaid(_referee, playerID);
+        case Research.ID:
+          return new Research(_referee, playerID, actionJSON);
+        case BuyBomb.ID:
+          return new BuyBomb(_referee, playerID);
+        case LaunchBomb.ID:
+          return new LaunchBomb(_referee, playerID, actionJSON);
+        case Forfeit.ID:
+          return new Forfeit(_referee, playerID);
         case PlayRoadBuilding.ID:
           return new PlayRoadBuilding(_referee, playerID);
         case TradeWithBank.ID:

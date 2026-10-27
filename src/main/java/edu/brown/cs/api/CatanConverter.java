@@ -33,6 +33,7 @@ import edu.brown.cs.board.TileStructure;
 import edu.brown.cs.board.TileType;
 import edu.brown.cs.catan.DevelopmentCard;
 import edu.brown.cs.catan.Faction;
+import edu.brown.cs.catan.Tech;
 import edu.brown.cs.catan.UnitType;
 import edu.brown.cs.catan.WarState;
 import edu.brown.cs.catan.GameSettings;
@@ -107,7 +108,7 @@ public class CatanConverter {
           .getID() : -1;
       this.hand = new Hand(ref.getPlayerByID(playerID),
           ref.getGameSettings().isCitiesAndKnights,
-          ref.getGameSettings().isCursedCatan);
+          ref.getGameSettings().isCursedCatan, ref.isWarActive());
       this.board = new BoardRaw(ref, ref.getBoard(),
           playerID);
       this.turnOrder = (ref.getGameStatus() != GameStatus.WAITING) ? ref
@@ -205,8 +206,9 @@ public class CatanConverter {
     private Boolean canBuildFortress;
     private Boolean canBuildTestSite;
     private Integer socialCredit;
+    private Integer numBombs;
 
-    public Hand(Player player, boolean isCK, boolean isCursed) {
+    public Hand(Player player, boolean isCK, boolean isCursed, boolean war) {
       resources = player.getResources();
       devCards = player.getDevCards();
       canBuildRoad = player.canBuildRoad();
@@ -219,6 +221,9 @@ public class CatanConverter {
         canBuildFortress = player.canBuildFortress();
         canBuildTestSite = player.canBuildTestSite();
         socialCredit = player.getSocialCredit();
+        if (war) {
+          numBombs = player.numBombs();
+        }
       }
       if (isCK) {
         commodities = player.getCommodities();
@@ -448,12 +453,23 @@ knight = knightPiece != null
     private Integer nuclearWinter;
     private Integer nuclearWinterRollNeeded;
     private String sanctioned;
+    private List<TechRaw> techTree = new ArrayList<>();
+
+    private static class TechRaw {
+      private String id;
+      private String label;
+      private String branch;
+      private String requires;
+    }
 
     private static class FactionRaw {
       private String name;
       private int morale;
       private int numUnits;
       private List<Integer> players;
+      private List<String> tech = new ArrayList<>();
+      private int researchPoints;
+      private int researchTotal;
     }
 
     private static class UnitsRaw {
@@ -467,12 +483,28 @@ knight = knightPiece != null
     public WarRaw(Referee ref, int playerID) {
       WarState war = ref.getWarState();
       myFaction = String.valueOf(war.getFaction(playerID));
+      for (Tech t : Tech.values()) {
+        TechRaw tr = new TechRaw();
+        tr.id = t.getId();
+        tr.label = t.getLabel();
+        tr.branch = t.getBranch();
+        tr.requires = t.getPrerequisite() == null ? null : t.getPrerequisite()
+            .getId();
+        techTree.add(tr);
+      }
       for (Faction f : war.getFactionList()) {
         FactionRaw fr = new FactionRaw();
         fr.name = f.toString();
         fr.morale = war.getMorale(f);
         fr.numUnits = war.getUnitCount(f);
         fr.players = war.getPlayersOf(f);
+        for (Tech t : Tech.values()) {
+          if (war.hasTech(f, t)) {
+            fr.tech.add(t.getId());
+          }
+        }
+        fr.researchPoints = war.getBankedPoints(f);
+        fr.researchTotal = war.getResearchTotal(f);
         factions.add(fr);
       }
       for (Map.Entry<HexCoordinate, Map<Faction, Map<UnitType, Integer>>> t : war
