@@ -32,6 +32,9 @@ import edu.brown.cs.board.Tile;
 import edu.brown.cs.board.TileStructure;
 import edu.brown.cs.board.TileType;
 import edu.brown.cs.catan.DevelopmentCard;
+import edu.brown.cs.catan.Faction;
+import edu.brown.cs.catan.UnitType;
+import edu.brown.cs.catan.WarState;
 import edu.brown.cs.catan.GameSettings;
 import edu.brown.cs.catan.Player;
 import edu.brown.cs.catan.Referee;
@@ -88,6 +91,7 @@ public class CatanConverter {
     // Cursed Catan fields (null when not in Cursed mode)
     private Integer industryTrack;
     private Boolean greatWarTriggered;
+    private WarRaw war;
     // C&K fields (null when not in C&K mode)
     private BarbarianTrackRaw barbarianTrack;
     private Integer merchantOwner;
@@ -114,6 +118,11 @@ public class CatanConverter {
           this.winReason = "exodia";
         } else if (ref.isDraw()) {
           this.winReason = "draw";
+        } else if (ref.isWarActive()
+            && ref.getNumTotalPoints(ref.getWinner().getID()) < ref
+                .getGameSettings().winningPointCount) {
+          // everyone else was eliminated
+          this.winReason = "survivor";
         } else {
           this.winReason = "points";
         }
@@ -139,6 +148,9 @@ public class CatanConverter {
       if (ref.getGameSettings().isCursedCatan) {
         this.industryTrack = ref.getIndustryTrack();
         this.greatWarTriggered = ref.isGreatWarTriggered();
+        if (ref.isWarActive()) {
+          this.war = new WarRaw(ref, playerID);
+        }
       }
       // C&K state
       if (ref.getGameSettings().isCitiesAndKnights && ref instanceof MasterReferee) {
@@ -425,6 +437,74 @@ knight = knightPiece != null
     }
   }
 
+  /**
+   * The Great War as the client sees it. Absent outside the war.
+   */
+  private static class WarRaw {
+    private String myFaction;
+    private List<FactionRaw> factions = new ArrayList<>();
+    private List<UnitsRaw> units = new ArrayList<>();
+    private Map<String, Integer> toDeploy;
+    private Integer nuclearWinter;
+    private Integer nuclearWinterRollNeeded;
+    private String sanctioned;
+
+    private static class FactionRaw {
+      private String name;
+      private int morale;
+      private int numUnits;
+      private List<Integer> players;
+    }
+
+    private static class UnitsRaw {
+      private int x;
+      private int y;
+      private int z;
+      private String faction;
+      private Map<String, Integer> units = new java.util.LinkedHashMap<>();
+    }
+
+    public WarRaw(Referee ref, int playerID) {
+      WarState war = ref.getWarState();
+      myFaction = String.valueOf(war.getFaction(playerID));
+      for (Faction f : war.getFactionList()) {
+        FactionRaw fr = new FactionRaw();
+        fr.name = f.toString();
+        fr.morale = war.getMorale(f);
+        fr.numUnits = war.getUnitCount(f);
+        fr.players = war.getPlayersOf(f);
+        factions.add(fr);
+      }
+      for (Map.Entry<HexCoordinate, Map<Faction, Map<UnitType, Integer>>> t : war
+          .getUnits().entrySet()) {
+        for (Map.Entry<Faction, Map<UnitType, Integer>> f : t.getValue()
+            .entrySet()) {
+          UnitsRaw u = new UnitsRaw();
+          u.x = t.getKey().getX();
+          u.y = t.getKey().getY();
+          u.z = t.getKey().getZ();
+          u.faction = f.getKey().toString();
+          for (Map.Entry<UnitType, Integer> c : f.getValue().entrySet()) {
+            u.units.put(c.getKey().toString(), c.getValue());
+          }
+          units.add(u);
+        }
+      }
+      Map<UnitType, Integer> owed = ref.getUnitsToDeploy(playerID);
+      if (!owed.isEmpty()) {
+        toDeploy = new java.util.LinkedHashMap<>();
+        for (Map.Entry<UnitType, Integer> e : owed.entrySet()) {
+          toDeploy.put(e.getKey().toString(), e.getValue());
+        }
+      }
+      nuclearWinter = war.getNuclearWinter();
+      nuclearWinterRollNeeded = war.rollNeededToAdvance();
+      if (war.getSanctioned() != null) {
+        sanctioned = war.getSanctioned().toString();
+      }
+    }
+  }
+
   private static class PublicPlayerRaw {
     private String name;
     private int id;
@@ -452,6 +532,8 @@ knight = knightPiece != null
     private Integer numFortresses;
     private Integer numTestSites;
     private Boolean longestTurn;
+    private String faction;
+    private Boolean eliminated;
 
     public PublicPlayerRaw(Player p, Referee r) {
       name = p.getName();
@@ -473,6 +555,10 @@ knight = knightPiece != null
         numFortresses = p.numFortresses();
         numTestSites = p.numTestSites();
         longestTurn = r.getLongestTurnPlayer() == p.getID();
+        if (r.isWarActive()) {
+          faction = String.valueOf(r.getFaction(p.getID()));
+          eliminated = r.isEliminated(p.getID());
+        }
       }
       if (r.getGameSettings().isCitiesAndKnights) {
         numKnights = p.getKnights().size();
