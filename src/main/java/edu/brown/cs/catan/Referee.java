@@ -278,4 +278,11 @@ public interface Referee {
       int winterDie, java.util.function.IntSupplier unitDie) {
     throw new UnsupportedOperationException("There is no war.");
   }
+
+  /**
+   * Whether the player's faction has researched a technology.
+   */
+  default boolean hasTech(int playerID, Tech tech) {
+    return false;
+  }
 }

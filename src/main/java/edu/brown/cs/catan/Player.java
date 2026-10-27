@@ -184,6 +184,29 @@ public interface Player {
   }
 
   /**
+   * How many Atomic Bombs the player holds (kept off-hand, Cursed Catan).
+   */
+  default int numBombs() {
+    return 0;
+  }
+
+  /**
+   * Adds an Atomic Bomb to the player's off-hand.
+   */
+  default void addBomb() {
+    throw new UnsupportedOperationException(
+        "Not supported for this player type.");
+  }
+
+  /**
+   * Uses up an Atomic Bomb.
+   */
+  default void useBomb() {
+    throw new UnsupportedOperationException(
+        "Not supported for this player type.");
+  }
+
+  /**
    * Total social credit of the development cards this player holds. Only used
    * to break ties in Cursed Catan.
    */

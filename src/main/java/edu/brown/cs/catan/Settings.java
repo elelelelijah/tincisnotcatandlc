@@ -133,6 +133,13 @@ public abstract class Settings {
   // Tile structures
   public final static Map<Resource, Double> FORTRESS_COST = ImmutableMap.of(
       Resource.BRICK, 2.0, Resource.CONCRETE, 1.0);
+  // A Research Point costs 3 resources of the player's choice
+  public final static int RESEARCH_POINT_COST = 3;
+
+  // An Atomic Bomb costs 3 uranium and 3 ore
+  public final static Map<Resource, Double> ATOMIC_BOMB_COST = ImmutableMap.of(
+      Resource.URANIUM, 3.0, Resource.ORE, 3.0);
+
   public final static Map<Resource, Double> TEST_SITE_COST = ImmutableMap.of(
       Resource.URANIUM, 1.0, Resource.CONCRETE, 2.0);
   public static final int MAX_FORTRESSES = 4;
@@ -143,7 +150,7 @@ public abstract class Settings {
   // Mirrors the starting stock HumanPlayer currently gives every resource for
   // testing (INITIAL_RESOURCES + 25), applied to coal and concrete in Cursed
   // Catan only. Uranium is locked until the Great War, so it starts empty.
-  public final static double CURSED_TEST_STARTING_STOCK = 0.0;
+  public final static double CURSED_TEST_STARTING_STOCK = 25.0;
 
   // --- Cities & Knights Constants ---
 

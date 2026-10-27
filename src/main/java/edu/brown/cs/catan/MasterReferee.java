@@ -670,6 +670,12 @@ public class MasterReferee implements Referee {
   }
 
   @Override
+  public boolean hasTech(int playerID, Tech tech) {
+    return _war != null && _war.getFaction(playerID) != null
+        && _war.hasTech(_war.getFaction(playerID), tech);
+  }
+
+  @Override
   public boolean isSanctioned(int playerID) {
     return _war != null && _war.getSanctioned() != null
         && _war.getFaction(playerID) == _war.getSanctioned();
@@ -1180,6 +1186,11 @@ public class MasterReferee implements Referee {
     @Override
     public boolean isEliminated(int playerID) {
       return _referee.isEliminated(playerID);
+    }
+
+    @Override
+    public boolean hasTech(int playerID, Tech tech) {
+      return _referee.hasTech(playerID, tech);
     }
 
     @Override

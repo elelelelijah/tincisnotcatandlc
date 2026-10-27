@@ -3,6 +3,8 @@ package edu.brown.cs.catan;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumMap;
+import java.util.EnumSet;
+import java.util.Set;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -31,11 +33,15 @@ public class WarState {
   private final Map<HexCoordinate, Map<Faction, Map<UnitType, Integer>>> _units = new LinkedHashMap<>();
   private int _nuclearWinter = 1;
   private Faction _sanctioned = null;
+  private final Map<Faction, Set<Tech>> _tech = new EnumMap<>(Faction.class);
+  private final Map<Faction, Integer> _banked = new EnumMap<>(Faction.class);
 
   public WarState(Map<Integer, Faction> factions) {
     _factions = Collections.unmodifiableMap(new LinkedHashMap<>(factions));
     for (Faction f : _factions.values()) {
       _morale.put(f, STARTING_MORALE);
+      _tech.put(f, EnumSet.noneOf(Tech.class));
+      _banked.put(f, 0);
     }
   }
 
@@ -210,5 +216,74 @@ public class WarState {
     if (_sanctioned == null) {
       _sanctioned = faction;
     }
+  }
+
+  // --------------------------------------------------------------- research
+
+  /** Everything the faction has researched. */
+  public Set<Tech> getTech(Faction faction) {
+    Set<Tech> set = _tech.get(faction);
+    return set == null ? EnumSet.noneOf(Tech.class) : EnumSet.copyOf(set);
+  }
+
+  public boolean hasTech(Faction faction, Tech tech) {
+    Set<Tech> set = _tech.get(faction);
+    return set != null && set.contains(tech);
+  }
+
+  /**
+   * Whether the faction can research the node now: it is not done yet, and
+   * the node above it is.
+   */
+  public boolean canResearch(Faction faction, Tech tech) {
+    if (!_tech.containsKey(faction) || hasTech(faction, tech)) {
+      return false;
+    }
+    return tech.getPrerequisite() == null
+        || hasTech(faction, tech.getPrerequisite());
+  }
+
+  /**
+   * Marks a node as researched; it works for the whole faction at once.
+   */
+  public void unlock(Faction faction, Tech tech) {
+    if (!canResearch(faction, tech)) {
+      throw new IllegalArgumentException(String.format(
+          "%s cannot research %s now.", faction, tech));
+    }
+    _tech.get(faction).add(tech);
+  }
+
+  /** Research Points the faction has gained but not spent yet. */
+  public int getBankedPoints(Faction faction) {
+    Integer n = _banked.get(faction);
+    return n == null ? 0 : n;
+  }
+
+  public void addResearchPoints(Faction faction, int points) {
+    if (_banked.containsKey(faction) && points > 0) {
+      _banked.put(faction, _banked.get(faction) + points);
+    }
+  }
+
+  /**
+   * Spends one banked Research Point.
+   *
+   * @return False if there was none.
+   */
+  public boolean spendResearchPoint(Faction faction) {
+    if (getBankedPoints(faction) < 1) {
+      return false;
+    }
+    _banked.put(faction, _banked.get(faction) - 1);
+    return true;
+  }
+
+  /**
+   * All the Research Points the faction has gained so far: nodes done plus
+   * points still banked. This is what the Morale rules compare.
+   */
+  public int getResearchTotal(Faction faction) {
+    return getTech(faction).size() + getBankedPoints(faction);
   }
 }

@@ -38,6 +38,7 @@ public class HumanPlayer implements Player {
   private int numCapitols;
   private int numFortresses;
   private int numTestSites;
+  private int numBombs;
 
   // Cities & Knights fields
   private final Map<Commodity, Double> commodities;
@@ -92,7 +93,7 @@ public class HumanPlayer implements Player {
         resources.put(r, Settings.INITIAL_RESOURCES
             + (stocked ? Settings.CURSED_TEST_STARTING_STOCK : 0.0));
       } else {
-        resources.put(r, Settings.INITIAL_RESOURCES);
+        resources.put(r, Settings.INITIAL_RESOURCES+25.0);
       }
     }
     // Initialize development card hand:
@@ -103,7 +104,7 @@ public class HumanPlayer implements Player {
     // Initialize Cities & Knights state:
     this.commodities = new HashMap<>();
     for (Commodity c : Commodity.values()) {
-      commodities.put(c, 0.0);
+      commodities.put(c, 20.0);
     }
     this.cityImprovement = new CityImprovement();
     this.knights = new ArrayList<>();
@@ -402,6 +403,24 @@ public class HumanPlayer implements Player {
     bank.discardResource(resource, count);
     removeResource(resource, CatanFormats.round(count));
 
+  }
+
+  @Override
+  public int numBombs() {
+    return numBombs;
+  }
+
+  @Override
+  public void addBomb() {
+    numBombs++;
+  }
+
+  @Override
+  public void useBomb() {
+    if (numBombs <= 0) {
+      throw new IllegalStateException("No bombs to use.");
+    }
+    numBombs--;
   }
 
   @Override
