@@ -765,6 +765,16 @@
 	<label><input type="checkbox" id="spy-network-toggle"> Use Spy Network (ignore fortresses)</label>
 </div>
 
+<!-- Cursed Catan: deploy starting forces at the start of the Great War -->
+<div id="deploy-panel" class="hidden">
+	<div><strong>Deploy your forces</strong> <span id="deploy-faction"></span></div>
+	<div id="deploy-units"></div>
+	<div class="text-muted" style="font-size:12px;">Pick a unit, then click a highlighted tile next to one of your buildings.</div>
+	<div id="deploy-placed"></div>
+	<button type="button" class="btn btn-default btn-xs" id="deploy-undo-btn">Undo</button>
+	<button type="button" class="btn btn-primary btn-xs" id="deploy-confirm-btn" disabled>Confirm deployment</button>
+</div>
+
 <!-- Modals -->
 
 <div class="modal fade" id="buy-dev-card-modal" tabindex="-1" role="dialog" aria-labelledby="buyDevCardLabel">
