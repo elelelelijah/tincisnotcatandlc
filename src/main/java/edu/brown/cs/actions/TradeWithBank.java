@@ -48,6 +48,10 @@ public class TradeWithBank implements Action {
   @Override
   public Map<Integer, ActionResponse> execute() {
     // Validation:
+    if (_ref.isSanctioned(_player.getID())) {
+      return ImmutableMap.of(_player.getID(), new ActionResponse(false,
+          "Your faction is under Sanctions: no maritime trading.", null));
+    }
     String lockMessage = CatanFormats.tradeLockMessage(_ref, _toGive, _toGet);
     if (lockMessage != null) {
       return ImmutableMap.of(_player.getID(), new ActionResponse(false,

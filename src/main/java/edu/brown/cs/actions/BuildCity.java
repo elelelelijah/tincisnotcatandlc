@@ -43,6 +43,11 @@ public class BuildCity implements Action {
 
   @Override
   public Map<Integer, ActionResponse> execute() {
+    String warMessage = CatanFormats.warBlocksConstruction(_ref);
+    if (warMessage != null) {
+      return java.util.Collections.singletonMap(_player.getID(),
+          new ActionResponse(false, warMessage, null));
+    }
     if (_ref.getGameStatus() == GameStatus.PROGRESS
         && !_ref.currentPlayer().equals(_player)) {
       ActionResponse resp = new ActionResponse(false,

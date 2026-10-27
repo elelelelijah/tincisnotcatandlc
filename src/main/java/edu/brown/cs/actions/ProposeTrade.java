@@ -97,9 +97,29 @@ public class ProposeTrade implements Action{
       }
     }
 
+    if (_ref.isWarActive()) {
+      boolean anyone = false;
+      for (Player p : _ref.getPlayers()) {
+        if (!p.equals(_player)
+            && _ref.getFaction(p.getID()) == _ref.getFaction(_player.getID())) {
+          anyone = true;
+        }
+      }
+      if (!anyone) {
+        toRet.put(_player.getID(), new ActionResponse(false,
+            "During the Great War you can only trade with your own faction, and nobody else is on it.",
+            _resources));
+        return toRet;
+      }
+    }
+
     Trade trade = new Trade(_player.getID(), _resources);
 
     for (Player p : _ref.getPlayers()) {
+      if (!p.equals(_player) && _ref.isWarActive()
+          && _ref.getFaction(p.getID()) != _ref.getFaction(_player.getID())) {
+        continue;
+      }
       if (!p.equals(_player)) {
         FollowUpAction toDo = new ReviewTrade(p.getID(), _resources, trade);
         toDoNext.add(toDo);

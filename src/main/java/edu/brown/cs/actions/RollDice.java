@@ -161,9 +161,13 @@ public class RollDice implements FollowUpAction {
       // factories produce (see FactoryProduction). A player with none simply
       // collects.
       Map<Integer, List<Resource>> deferredFactories = new HashMap<>();
+      // In the Great War a factory simply produces 1 of any resource
+      Map<Integer, Integer> warFactoryGold = new HashMap<>();
       for (Map.Entry<Integer, List<Resource>> e : factoryUnits.entrySet()) {
         int owner = e.getKey();
-        if (coalBefore.get(owner) >= 1.0) {
+        if (_ref.isWarActive()) {
+          warFactoryGold.put(owner, e.getValue().size());
+        } else if (coalBefore.get(owner) >= 1.0) {
           deferredFactories.put(owner, e.getValue());
         } else {
           if (!playerResourceCount.containsKey(owner)) {
@@ -180,6 +184,7 @@ public class RollDice implements FollowUpAction {
       // Cursed Catan: a rolled gold tile owes each building's owner that
       // building's production in resources of their choice.
       Map<Integer, Integer> goldOwed = new HashMap<>();
+      goldOwed.putAll(warFactoryGold);
       for (Tile t : tiles) {
         if (t.getType() == TileType.GOLD && t.getRollNumber() == diceRoll) {
           for (Intersection i : t.getIntersections()) {
@@ -415,7 +420,7 @@ public class RollDice implements FollowUpAction {
         ActionResponse respToAll = new ActionResponse(true,
             "7 was rolled. No one has more than 7 cards.", null);
         ActionResponse respToPlayer = new ActionResponse(true,
-            "7 was rolled. You get to move the Robber.", null);
+            _ref.isWarActive() ? "7 was rolled." : "7 was rolled. You get to move the Robber.", null);
         for (Player p : _ref.getPlayers()) {
           if (p.equals(_player)) {
             toRet.put(p.getID(), respToPlayer);
@@ -424,10 +429,12 @@ public class RollDice implements FollowUpAction {
           }
         }
       }
-      // Follow up MoveRobber action:
-      Collection<FollowUpAction> followUps = new ArrayList<>();
-      followUps.add(new MoveRobber(_player.getID()));
-      _ref.addFollowUp(followUps);
+      // Follow up MoveRobber action (there is no robber in the Great War):
+      if (!_ref.isWarActive()) {
+        Collection<FollowUpAction> followUps = new ArrayList<>();
+        followUps.add(new MoveRobber(_player.getID()));
+        _ref.addFollowUp(followUps);
+      }
     }
 
     // --- Cities & Knights Event Die Logic ---

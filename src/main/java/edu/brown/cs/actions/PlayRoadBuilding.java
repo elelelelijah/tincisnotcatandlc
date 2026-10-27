@@ -35,6 +35,11 @@ public class PlayRoadBuilding implements Action {
 
   @Override
   public Map<Integer, ActionResponse> execute() {
+    String warMessage = CatanFormats.warBlocksConstruction(_ref);
+    if (warMessage != null) {
+      return java.util.Collections.singletonMap(_player.getID(),
+          new ActionResponse(false, warMessage, null));
+    }
     // Validation:
     if (!(_player.getDevCards().get(DevelopmentCard.ROAD_BUILDING) > 0)) {
       return ImmutableMap.of(_player.getID(), new ActionResponse(false,

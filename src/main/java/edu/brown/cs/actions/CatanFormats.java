@@ -93,4 +93,29 @@ public abstract class CatanFormats {
     return null;
   }
 
+  /**
+   * Normal construction stops when the Great War begins: only fortresses and
+   * test sites can still be built.
+   *
+   * @return An error message, or null when construction is allowed.
+   */
+  public static String warBlocksConstruction(Referee ref) {
+    if (ref.isWarActive()) {
+      return "Normal construction stops during the Great War. Only fortresses and test sites can be built.";
+    }
+    return null;
+  }
+
+  /**
+   * There is no robber in the Great War.
+   *
+   * @return An error message, or null when the robber exists.
+   */
+  public static String warBlocksRobber(Referee ref) {
+    if (ref.isWarActive()) {
+      return "There is no robber in the Great War.";
+    }
+    return null;
+  }
+
 }

@@ -23,12 +23,28 @@ public class GoldResource implements FollowUpAction {
   private Referee _ref;
   private final int _playerID;
   private final int _count;
+  private final String _label;
   private Map<Resource, Integer> _choice;
   private boolean _isSetup;
 
   public GoldResource(int playerID, int count) {
+    this(playerID, count, "Gold");
+  }
+
+  /**
+   * Same choice, with another name in the messages (the war's coal exchange).
+   *
+   * @param playerID
+   *          Who chooses.
+   * @param count
+   *          How many resources.
+   * @param label
+   *          What to call it, e.g. "Coal exchange".
+   */
+  public GoldResource(int playerID, int count, String label) {
     _playerID = playerID;
     _count = count;
+    _label = label;
     _isSetup = false;
   }
 
@@ -61,11 +77,11 @@ public class GoldResource implements FollowUpAction {
     for (Player p : _ref.getPlayers()) {
       if (p.getID() == _playerID) {
         toRet.put(p.getID(), new ActionResponse(true,
-            String.format("Gold: you received %s.", taken), null));
+            String.format("%s: you received %s.", _label, taken), null));
       } else {
         toRet.put(p.getID(), new ActionResponse(true,
-            String.format("%s took resources from a gold tile.",
-                player.getName()),
+            String.format("%s took resources (%s).", player.getName(),
+                _label.toLowerCase()),
             null));
       }
     }
@@ -75,8 +91,8 @@ public class GoldResource implements FollowUpAction {
   @Override
   public JsonObject getData() {
     JsonObject json = new JsonObject();
-    json.addProperty("message", String.format(
-        "Gold! Choose %d resource%s.", _count, _count == 1 ? "" : "s"));
+    json.addProperty("message", String.format("%s! Choose %d resource%s.",
+        _label, _count, _count == 1 ? "" : "s"));
     json.addProperty("count", _count);
     return json;
   }
@@ -104,9 +120,9 @@ public class GoldResource implements FollowUpAction {
       for (Map.Entry<String, JsonElement> e : chosen.entrySet()) {
         Resource r = Resource.stringToResource(e.getKey());
         int amount = e.getValue().getAsInt();
-        if (!isChoosable(r)) {
+        if (!isChoosable(r) || (r == Resource.COAL && _ref.isWarActive())) {
           throw new IllegalArgumentException(
-              String.format("You cannot take %s from gold.", r));
+              String.format("You cannot take %s here.", r));
         }
         if (amount < 0) {
           throw new IllegalArgumentException("Amounts cannot be negative.");

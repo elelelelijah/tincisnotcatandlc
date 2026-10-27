@@ -45,6 +45,11 @@ public class BuildFactory implements Action {
 
   @Override
   public Map<Integer, ActionResponse> execute() {
+    String warMessage = CatanFormats.warBlocksConstruction(_ref);
+    if (warMessage != null) {
+      return java.util.Collections.singletonMap(_player.getID(),
+          new ActionResponse(false, warMessage, null));
+    }
     if (!_ref.getGameSettings().isCursedCatan) {
       return fail("Factories only exist in Cursed Catan.");
     }

@@ -56,6 +56,13 @@ public class EndTurn implements Action {
       }
     }
     _ref.startNextTurn();
+    // Cursed Catan: the Great War has just begun. Everybody exchanges coal and
+    // deploys forces before the next player rolls.
+    boolean warStarted = false;
+    for (Collection<FollowUpAction> group : _ref.takeWarStartFollowUps()) {
+      _ref.addFollowUp(group);
+      warStarted = true;
+    }
     Player nextPlayer = _ref.currentPlayer();
     if (nextPlayer.getDevCards().get(DevelopmentCard.KNIGHT) != 0) {
       _hasKnight = true;
@@ -91,6 +98,17 @@ public class EndTurn implements Action {
         ActionResponse toAdd = new ActionResponse(true, message, null);
         toRet.put(p.getID(), toAdd);
       }
+    }
+    if (warStarted) {
+      StringBuilder factions = new StringBuilder();
+      for (Player p : _ref.getPlayers()) {
+        if (factions.length() > 0) {
+          factions.append(", ");
+        }
+        factions.append(String.format("%s: %s", p.getName(),
+            _ref.getFaction(p.getID())));
+      }
+      industryNote += " THE GREAT WAR HAS BEGUN! Factions: " + factions + ".";
     }
     if (!industryNote.isEmpty()) {
       for (Player p : _ref.getPlayers()) {
