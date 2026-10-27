@@ -715,6 +715,25 @@ public class Board {
   }
 
   /**
+   * Whether nothing can grow any more: every land tile in the collection is
+   * Desert or Wasteland. In Cursed Catan that is a draw.
+   *
+   * @param tiles
+   *          The tiles to look at (sea tiles are ignored).
+   * @return True if every land tile is Desert or Wasteland.
+   */
+  public static boolean isAllBarren(Collection<Tile> tiles) {
+    for (Tile t : tiles) {
+      TileType type = t.getType();
+      if (type != TileType.SEA && type != TileType.DESERT
+          && type != TileType.WASTELAND) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /**
    * Gets a tile by its hex coordinate.
    *
    * @param coord The coordinate to look up.
