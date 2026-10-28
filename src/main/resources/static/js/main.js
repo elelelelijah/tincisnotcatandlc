@@ -28,8 +28,61 @@ $(window).load(function () {
 var dragging = false;
 var lastX;
 var lastY;
-
 // When mouse is pressed, start dragging mode and save current position
+$(document).on("mousedown", "#board-viewport", function (event) {
+	// The viewport exists before the async game-state response creates the board.
+	if (!board || typeof board.translate !== "function") return;
+	lastX = event.pageX;
+	lastY = event.pageY;
+	dragging = true;
+	$(document).on("mousemove", "#board-viewport", onMouseMove);
+});
+
+// When mouse is moved, translate the board from last position
+function onMouseMove(event) {
+	if (!dragging) return;
+	if (!board || typeof board.translate !== "function") {
+		// A refresh/game-state rebuild can temporarily leave no usable board.
+		dragging = false;
+		$(document).off("mousemove", "#board-viewport", onMouseMove);
+		return;
+	}
+	board.translate(event.pageX - lastX, event.pageY - lastY);
+	lastX = event.pageX;
+	lastY = event.pageY;
+}
+
+// When mouse is released, do final translate and leave dragging mode
+$(document).on("mouseup mouseleave", "#board-viewport", function (event) {
+	if (!dragging) return;
+	dragging = false;
+	$(document).off("mousemove", "#board-viewport", onMouseMove);
+	// Mouse-up may arrive before the asynchronous board restore has completed.
+	if (board && typeof board.translate === "function"
+		&& Number.isFinite(lastX) && Number.isFinite(lastY)
+		&& Number.isFinite(event.pageX) && Number.isFinite(event.pageY)) {
+		board.translate(lastX - event.pageX, lastY - event.pageY);
+	}
+});
+
+// Also clear drag state if the pointer is released outside the viewport.
+$(document).on("mouseup", function () {
+	if (dragging) {
+		dragging = false;
+		$(document).off("mousemove", "#board-viewport", onMouseMove);
+	}
+});
+
+// When mouse is scrolled, scale board
+$(document).on("wheel", "#board-viewport", function (event) {
+	if (!board || typeof board.scale !== "function" || !event.originalEvent) return;
+	if (Math.abs(event.originalEvent.deltaY) > 0.01) {
+		var deltaScale = event.originalEvent.deltaY > 0 ? 10 : -10;
+		board.scale(deltaScale);
+	}
+});
+
+/*When mouse is pressed, start dragging mode and save current position
 $(document).on("mousedown", "#board-viewport", function (event) {
 	lastX = event.pageX;
 	lastY = event.pageY;
