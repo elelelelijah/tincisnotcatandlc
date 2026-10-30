@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.EnumSet;
+import java.util.HashSet;
 import java.util.Set;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -33,6 +34,11 @@ public class WarState {
   private final Map<HexCoordinate, Map<Faction, Map<UnitType, Integer>>> _units = new LinkedHashMap<>();
   private int _nuclearWinter = 1;
   private Faction _sanctioned = null;
+  // Units that built or moved this turn, and stacks that are entrenched
+  private final Map<HexCoordinate, Map<Faction, Map<UnitType, Integer>>> _moved = new LinkedHashMap<>();
+  private final Map<HexCoordinate, Map<Faction, Map<UnitType, Integer>>> _built = new LinkedHashMap<>();
+  private final Map<HexCoordinate, Set<Faction>> _entrenched = new LinkedHashMap<>();
+  private final Set<HexCoordinate> _fought = new HashSet<>();
   private final Map<Faction, Set<Tech>> _tech = new EnumMap<>(Faction.class);
   private final Map<Faction, Integer> _banked = new EnumMap<>(Faction.class);
 
@@ -285,5 +291,223 @@ public class WarState {
    */
   public int getResearchTotal(Faction faction) {
     return getTech(faction).size() + getBankedPoints(faction);
+  }
+
+  // ----------------------------------------------------- movement and combat
+
+  /** Whether the unit type is a ground troop (everything but aircraft). */
+  public static boolean isGround(UnitType type) {
+    return type != UnitType.AIRCRAFT;
+  }
+
+  private static int get(
+      Map<HexCoordinate, Map<Faction, Map<UnitType, Integer>>> map,
+      HexCoordinate tile, Faction faction, UnitType type) {
+    Map<Faction, Map<UnitType, Integer>> onTile = map.get(tile);
+    if (onTile == null || onTile.get(faction) == null) {
+      return 0;
+    }
+    Integer n = onTile.get(faction).get(type);
+    return n == null ? 0 : n;
+  }
+
+  private static void put(
+      Map<HexCoordinate, Map<Faction, Map<UnitType, Integer>>> map,
+      HexCoordinate tile, Faction faction, UnitType type, int count) {
+    Map<Faction, Map<UnitType, Integer>> onTile = map.get(tile);
+    if (onTile == null) {
+      onTile = new EnumMap<>(Faction.class);
+      map.put(tile, onTile);
+    }
+    Map<UnitType, Integer> mine = onTile.get(faction);
+    if (mine == null) {
+      mine = new EnumMap<>(UnitType.class);
+      onTile.put(faction, mine);
+    }
+    if (count <= 0) {
+      mine.remove(type);
+    } else {
+      mine.put(type, count);
+    }
+  }
+
+  /**
+   * Adds a unit that was built this turn: it cannot move or fight until the
+   * next turn (ground troops can still entrench).
+   */
+  public void addBuiltUnit(HexCoordinate tile, Faction faction, UnitType type) {
+    addUnits(tile, faction, type, 1);
+    put(_built, tile, faction, type, get(_built, tile, faction, type) + 1);
+  }
+
+  /** How many of the units built this turn are on the tile. */
+  public int getBuiltThisTurn(HexCoordinate tile, Faction faction, UnitType type) {
+    return get(_built, tile, faction, type);
+  }
+
+  /**
+   * How many units of the type could move or entrench from the tile now:
+   * the ones that did not arrive, entrench or get built this turn.
+   */
+  public int getReadyToMove(HexCoordinate tile, Faction faction, UnitType type) {
+    return Math.max(0, getUnits(tile, faction, type)
+        - get(_moved, tile, faction, type) - get(_built, tile, faction, type));
+  }
+
+  /**
+   * How many ground troops on the tile could entrench: everything that has
+   * not moved this turn (units built this turn can entrench).
+   */
+  public int getReadyToEntrench(HexCoordinate tile, Faction faction) {
+    int n = 0;
+    for (UnitType t : UnitType.values()) {
+      if (isGround(t)) {
+        n += Math.max(0, getUnits(tile, faction, t)
+            - get(_moved, tile, faction, t));
+      }
+    }
+    return n;
+  }
+
+  /**
+   * How many units of the type can fight on the tile: everything except what
+   * was built this turn.
+   */
+  public int getReadyToFight(HexCoordinate tile, Faction faction, UnitType type) {
+    return Math.max(0, getUnits(tile, faction, type)
+        - get(_built, tile, faction, type));
+  }
+
+  /**
+   * Moves units from one tile to the next; they cannot move again this turn.
+   * Troops that arrive on a tile where their faction is entrenched are
+   * entrenched too.
+   */
+  public void moveUnits(HexCoordinate from, HexCoordinate to, Faction faction,
+      UnitType type, int count) {
+    if (count > getReadyToMove(from, faction, type)) {
+      throw new IllegalArgumentException("Those units cannot move.");
+    }
+    removeUnit(from, faction, type, count);
+    clampFlags(from, faction, type);
+    addUnits(to, faction, type, count);
+    put(_moved, to, faction, type, get(_moved, to, faction, type) + count);
+    cleanEntrenchment(from, faction);
+  }
+
+  /**
+   * Entrenches the ground troops on the tile. They use up their move.
+   */
+  public void entrench(HexCoordinate tile, Faction faction) {
+    Set<Faction> set = _entrenched.get(tile);
+    if (set == null) {
+      set = EnumSet.noneOf(Faction.class);
+      _entrenched.put(tile, set);
+    }
+    set.add(faction);
+    for (UnitType t : UnitType.values()) {
+      if (isGround(t)) {
+        put(_moved, tile, faction, t, getUnits(tile, faction, t));
+      }
+    }
+  }
+
+  public boolean isEntrenched(HexCoordinate tile, Faction faction) {
+    Set<Faction> set = _entrenched.get(tile);
+    return set != null && set.contains(faction);
+  }
+
+  /**
+   * Removes casualties (and keeps the bookkeeping straight).
+   *
+   * @return How many were removed.
+   */
+  public int killUnits(HexCoordinate tile, Faction faction, UnitType type,
+      int count) {
+    int removed = removeUnit(tile, faction, type, count);
+    clampFlags(tile, faction, type);
+    cleanEntrenchment(tile, faction);
+    return removed;
+  }
+
+  private void clampFlags(HexCoordinate tile, Faction faction, UnitType type) {
+    int total = getUnits(tile, faction, type);
+    put(_moved, tile, faction, type, Math.min(total, get(_moved, tile, faction,
+        type)));
+    put(_built, tile, faction, type, Math.min(total, get(_built, tile, faction,
+        type)));
+  }
+
+  private void cleanEntrenchment(HexCoordinate tile, Faction faction) {
+    boolean anyGround = false;
+    for (UnitType t : UnitType.values()) {
+      if (isGround(t) && getUnits(tile, faction, t) > 0) {
+        anyGround = true;
+      }
+    }
+    if (!anyGround && _entrenched.get(tile) != null) {
+      _entrenched.get(tile).remove(faction);
+    }
+  }
+
+  /**
+   * Whether troops of a faction other than the given one are on the tile.
+   *
+   * @param groundOnly
+   *          Only count ground troops (aircraft do not stop production).
+   */
+  public boolean hasEnemyUnits(HexCoordinate tile, Faction faction,
+      boolean groundOnly) {
+    Map<Faction, Map<UnitType, Integer>> onTile = _units.get(tile);
+    if (onTile == null) {
+      return false;
+    }
+    for (Map.Entry<Faction, Map<UnitType, Integer>> e : onTile.entrySet()) {
+      if (e.getKey() == faction) {
+        continue;
+      }
+      for (Map.Entry<UnitType, Integer> u : e.getValue().entrySet()) {
+        if (u.getValue() > 0 && (!groundOnly || isGround(u.getKey()))) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  /** The factions (other than the given one) that have units on the tile. */
+  public Set<Faction> getEnemyFactionsOn(HexCoordinate tile, Faction faction) {
+    Set<Faction> set = new HashSet<>();
+    Map<Faction, Map<UnitType, Integer>> onTile = _units.get(tile);
+    if (onTile != null) {
+      for (Map.Entry<Faction, Map<UnitType, Integer>> e : onTile.entrySet()) {
+        int n = 0;
+        for (int v : e.getValue().values()) {
+          n += v;
+        }
+        if (e.getKey() != faction && n > 0) {
+          set.add(e.getKey());
+        }
+      }
+    }
+    return set;
+  }
+
+  /**
+   * A new turn begins: everything that moved or was built can act again.
+   */
+  public void clearTurnFlags() {
+    _moved.clear();
+    _built.clear();
+    _fought.clear();
+  }
+
+  /** Whether a fight has already happened on the tile this turn. */
+  public boolean hasFoughtThisTurn(HexCoordinate tile) {
+    return _fought.contains(tile);
+  }
+
+  public void markFought(HexCoordinate tile) {
+    _fought.add(tile);
   }
 }

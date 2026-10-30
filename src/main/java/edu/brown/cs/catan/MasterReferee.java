@@ -241,6 +241,9 @@ public class MasterReferee implements Referee {
   public void startNextTurn() {
     recordLongestTurn();
     _spyNetworkActive = false;
+    if (_war != null) {
+      _war.clearTurnFlags();
+    }
     int turnNum = _turn.getTurnNum();
     Player nextPlayer = _players.get(_turnOrder.get(turnNum
         % _gameSettings.numPlayers));
@@ -770,6 +773,7 @@ public class MasterReferee implements Referee {
       Building b = i.getBuilding();
       if (b != null && !b.isRuined()) {
         b.setRuined(true);
+        b.setHp(4);
         _war.changeMorale(_war.getFaction(b.getPlayer().getID()), -1);
       }
     }
@@ -824,6 +828,37 @@ public class MasterReferee implements Referee {
         t.setRollNumber(0);
       }
     }
+  }
+
+  /**
+   * Occupied buildings count for neither victory points nor elimination: the
+   * points their owner loses.
+   */
+  private int occupiedPoints(Player player) {
+    if (_war == null) {
+      return 0;
+    }
+    int points = 0;
+    Set<Building> seen = new HashSet<>();
+    for (Tile t : _board.getTiles()) {
+      for (Intersection i : t.getIntersections()) {
+        Building b = i.getBuilding();
+        if (b == null || !b.getPlayer().equals(player)
+            || b.getOccupier() == null || !seen.add(b)) {
+          continue;
+        }
+        if (b instanceof Capitol) {
+          points += Settings.CAPITOL_POINT_VAL;
+        } else if (b instanceof City) {
+          points += Settings.CITY_POINT_VAL;
+        } else if (b instanceof Factory) {
+          points += Settings.FACTORY_POINT_VAL;
+        } else {
+          points += Settings.SETTLEMENT_POINT_VAL;
+        }
+      }
+    }
+    return points;
   }
 
   @Override
@@ -980,6 +1015,7 @@ public class MasterReferee implements Referee {
       if (id == _longestTurnPlayer) {
         cursedPoints -= Settings.CURSED_LONGEST_TURN_PENALTY;
       }
+      cursedPoints -= occupiedPoints(player);
     }
 
     return settlementPoints + cityPoints + roadArmyPts + ckPoints
