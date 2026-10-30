@@ -20,6 +20,10 @@ import edu.brown.cs.actions.EndTurn;
 import edu.brown.cs.actions.FollowUpAction;
 import edu.brown.cs.actions.ImproveCityTrack;
 import edu.brown.cs.actions.PlaceKnight;
+import edu.brown.cs.actions.BuildUnit;
+import edu.brown.cs.actions.DeclareCombat;
+import edu.brown.cs.actions.Entrench;
+import edu.brown.cs.actions.MoveUnits;
 import edu.brown.cs.actions.BuyBomb;
 import edu.brown.cs.actions.Forfeit;
 import edu.brown.cs.actions.LaunchBomb;
@@ -127,6 +131,14 @@ public class ActionFactory {
           return new PlayKnight(_referee, playerID);
         case PlayBorderRaid.ID:
           return new PlayBorderRaid(_referee, playerID);
+        case BuildUnit.ID:
+          return new BuildUnit(_referee, playerID, actionJSON);
+        case MoveUnits.ID:
+          return new MoveUnits(_referee, playerID, actionJSON);
+        case Entrench.ID:
+          return new Entrench(_referee, playerID, actionJSON);
+        case DeclareCombat.ID:
+          return new DeclareCombat(_referee, playerID, actionJSON);
         case Research.ID:
           return new Research(_referee, playerID, actionJSON);
         case BuyBomb.ID:

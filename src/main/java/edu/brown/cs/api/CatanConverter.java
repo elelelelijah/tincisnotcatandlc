@@ -344,6 +344,11 @@ public class CatanConverter {
     private int player;
     private final String type;
     private final String metropolis;
+    // Cursed Catan: ruins, occupation and damage (omitted when not relevant)
+    private Boolean ruined;
+    private String occupiedBy;
+    private Integer hp;
+    private Integer maxHp;
 
     BuildingRaw(Building building, String metropolis) {
       if (building.getPlayer() != null) {
@@ -351,6 +356,17 @@ public class CatanConverter {
       }
       type = building.getClass().getSimpleName().toLowerCase();
       this.metropolis = metropolis;
+      if (building.isRuined()) {
+        ruined = true;
+      }
+      if (building.getOccupier() != null) {
+        occupiedBy = building.getOccupier().toString();
+      }
+      if (building.getMaxHp() > 0
+          && (building.isRuined() || building.getHp() < building.getMaxHp())) {
+        hp = building.getHp();
+        maxHp = building.getMaxHp();
+      }
     }
 
     @Override
@@ -478,6 +494,8 @@ knight = knightPiece != null
       private int z;
       private String faction;
       private Map<String, Integer> units = new java.util.LinkedHashMap<>();
+      private boolean entrenched;
+      private Map<String, Integer> canMove = new java.util.LinkedHashMap<>();
     }
 
     public WarRaw(Referee ref, int playerID) {
@@ -516,6 +534,13 @@ knight = knightPiece != null
           u.y = t.getKey().getY();
           u.z = t.getKey().getZ();
           u.faction = f.getKey().toString();
+          u.entrenched = war.isEntrenched(t.getKey(), f.getKey());
+          for (UnitType ut : UnitType.values()) {
+            int ready = war.getReadyToMove(t.getKey(), f.getKey(), ut);
+            if (ready > 0) {
+              u.canMove.put(ut.toString(), ready);
+            }
+          }
           for (Map.Entry<UnitType, Integer> c : f.getValue().entrySet()) {
             u.units.put(c.getKey().toString(), c.getValue());
           }
