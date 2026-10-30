@@ -28,61 +28,8 @@ $(window).load(function () {
 var dragging = false;
 var lastX;
 var lastY;
+
 // When mouse is pressed, start dragging mode and save current position
-$(document).on("mousedown", "#board-viewport", function (event) {
-	// The viewport exists before the async game-state response creates the board.
-	if (!board || typeof board.translate !== "function") return;
-	lastX = event.pageX;
-	lastY = event.pageY;
-	dragging = true;
-	$(document).on("mousemove", "#board-viewport", onMouseMove);
-});
-
-// When mouse is moved, translate the board from last position
-function onMouseMove(event) {
-	if (!dragging) return;
-	if (!board || typeof board.translate !== "function") {
-		// A refresh/game-state rebuild can temporarily leave no usable board.
-		dragging = false;
-		$(document).off("mousemove", "#board-viewport", onMouseMove);
-		return;
-	}
-	board.translate(event.pageX - lastX, event.pageY - lastY);
-	lastX = event.pageX;
-	lastY = event.pageY;
-}
-
-// When mouse is released, do final translate and leave dragging mode
-$(document).on("mouseup mouseleave", "#board-viewport", function (event) {
-	if (!dragging) return;
-	dragging = false;
-	$(document).off("mousemove", "#board-viewport", onMouseMove);
-	// Mouse-up may arrive before the asynchronous board restore has completed.
-	if (board && typeof board.translate === "function"
-		&& Number.isFinite(lastX) && Number.isFinite(lastY)
-		&& Number.isFinite(event.pageX) && Number.isFinite(event.pageY)) {
-		board.translate(lastX - event.pageX, lastY - event.pageY);
-	}
-});
-
-// Also clear drag state if the pointer is released outside the viewport.
-$(document).on("mouseup", function () {
-	if (dragging) {
-		dragging = false;
-		$(document).off("mousemove", "#board-viewport", onMouseMove);
-	}
-});
-
-// When mouse is scrolled, scale board
-$(document).on("wheel", "#board-viewport", function (event) {
-	if (!board || typeof board.scale !== "function" || !event.originalEvent) return;
-	if (Math.abs(event.originalEvent.deltaY) > 0.01) {
-		var deltaScale = event.originalEvent.deltaY > 0 ? 10 : -10;
-		board.scale(deltaScale);
-	}
-});
-
-/*When mouse is pressed, start dragging mode and save current position
 $(document).on("mousedown", "#board-viewport", function (event) {
 	lastX = event.pageX;
 	lastY = event.pageY;
@@ -961,7 +908,7 @@ var timeoutInterval;
  * @param disconnectData - data about the users that have disconnected
  */
 function showDisconnectedUsersModal(disconnectData) {
-	/*clearInterval(timeoutInterval);
+	clearInterval(timeoutInterval);
 	timeoutInterval = setInterval(function () {
 		var millisLeft = disconnectData.expiresAt - Date.now();
 		var secondsLeft = Math.round(millisLeft / 1000);
@@ -970,7 +917,7 @@ function showDisconnectedUsersModal(disconnectData) {
 		$("#disconnected-user-time").text(secondsLeft);
 	}, 1000);
 
-	$("#disconnected-user-modal").modal("show");*/
+	$("#disconnected-user-modal").modal("show");
 }
 
 // Hide the disconnected users modal
@@ -2656,6 +2603,8 @@ function exitBorderRaidMode() {
 
 // The war section of the game state, or null in peacetime
 var warData = null;
+// The player's hand from the latest state (resources, bombs, ...)
+var lastHandData = {};
 
 var NUCLEAR_WINTER_ROLLS = [null, null, "6", "5-6", "4-6", "3-6", "2-6"];
 var NUCLEAR_WINTER_NOTES = {
@@ -2721,6 +2670,8 @@ function drawWarPanel() {
 		panel.append($("<p id='longest-turn-info'></p>").append($("<strong></strong>").text("Longest Turn: "))
 			.append(document.createTextNode(playersById[longestTurnPlayerId].name + " (" + longestTurnSeconds + "s, \u22122 VP)")));
 	}
+	panel.append(buildTechTree());
+	panel.append(buildBombSection());
 	$("#game-stats-container").append(panel);
 
 	// Normal construction has stopped
@@ -2750,6 +2701,9 @@ function drawWarUnits() {
 			if (u.units.hasOwnProperty(type)) {
 				text.push((letters[type] || "?") + u.units[type]);
 			}
+		}
+		if (u.entrenched) {
+			text.push("dug in");
 		}
 		byTile[id].append(factionChip(u.faction).attr("title", u.faction + ": " + text.join(" ")).text(u.faction + " " + text.join(" ")));
 	}
@@ -2913,4 +2867,494 @@ $(document).on("click", "#deploy-confirm-btn", function () {
 	}
 	sendDeployUnitsAction(merged);
 	exitDeployMode();
+});
+
+
+// ---- Military Technology
+
+var TECH_LINES = [
+	{ branch: "trunk", title: "Start" },
+	{ branch: "tanks", title: "Tanks" },
+	{ branch: "infantry-artillery", title: "Infantry/Artillery" },
+	{ branch: "aircraft", title: "Aircraft" },
+	{ branch: "nuclear", title: "Nuclear Weapons" }
+];
+
+function myFactionData() {
+	if (!warData) {
+		return null;
+	}
+	for (var i = 0; i < warData.factions.length; i++) {
+		if (warData.factions[i].name === warData.myFaction) {
+			return warData.factions[i];
+		}
+	}
+	return null;
+}
+
+/*
+ * Draws the faction's technology tree: researched nodes, nodes that can be
+ * researched now (click one), and locked nodes.
+ */
+function buildTechTree() {
+	var mine = myFactionData();
+	var done = {};
+	var mineTech = mine.tech || [];
+	for (var i = 0; i < mineTech.length; i++) {
+		done[mineTech[i]] = true;
+	}
+	var wrap = $("<div id='tech-wrap'></div>");
+	wrap.append($("<p style='margin-top:6px;'></p>").append($("<strong></strong>").text("Military Technology"))
+		.append(document.createTextNode(" \u00b7 banked Research Points: " + mine.researchPoints)));
+
+	var tree = $("<div id='tech-tree'></div>");
+	var conventional = $("<div class='tech-block'></div>");
+	var lines = $("<div class='tech-lines'></div>");
+	var nuclear = $("<div class='tech-block'></div>");
+	for (var l = 0; l < TECH_LINES.length; l++) {
+		var line = $("<div class='tech-line'></div>").append($("<div class='tech-line-title'></div>").text(TECH_LINES[l].title));
+		for (var t = 0; t < (warData.techTree || []).length; t++) {
+			var node = warData.techTree[t];
+			if (node.branch !== TECH_LINES[l].branch) {
+				continue;
+			}
+			var state = done[node.id] ? "done" : ((!node.requires || done[node.requires]) ? "available" : "locked");
+			line.append($("<div class='tech-node'></div>").addClass("tech-" + state).attr("data-node", node.id)
+				.attr("title", node.label).text(node.label));
+		}
+		if (TECH_LINES[l].branch === "trunk") {
+			conventional.append(line);
+		} else if (TECH_LINES[l].branch === "nuclear") {
+			nuclear.append(line);
+		} else {
+			lines.append(line);
+		}
+	}
+	conventional.append(lines);
+	tree.append(conventional).append(nuclear);
+	wrap.append(tree);
+	wrap.append($("<p class='text-muted' style='font-size:11px;'></p>")
+		.text("Click a highlighted node to research it (3 resources of your choice). Benefits apply to your whole faction."));
+	return wrap;
+}
+
+var researchNode = null;
+var researchPay = {};
+var PAYABLE_RESOURCES = ["brick", "wood", "ore", "wheat", "sheep", "concrete", "uranium"];
+
+function researchPayTotal() {
+	var total = 0;
+	for (var r in researchPay) {
+		if (researchPay.hasOwnProperty(r)) {
+			total += researchPay[r];
+		}
+	}
+	return total;
+}
+
+function startResearch(nodeId) {
+	var mine = myFactionData();
+	if (mine.researchPoints > 0) {
+		if (window.confirm("Spend a banked Research Point on this technology?")) {
+			sendResearchAction(nodeId, null);
+		}
+		return;
+	}
+	researchNode = nodeId;
+	researchPay = {};
+	var name = nodeId;
+	for (var i = 0; i < warData.techTree.length; i++) {
+		if (warData.techTree[i].id === nodeId) {
+			name = warData.techTree[i].label;
+		}
+	}
+	$("#research-node-name").text(name);
+	var rows = $("#research-pay-rows").empty();
+	var held = lastHandData.resources || {};
+	for (var r = 0; r < PAYABLE_RESOURCES.length; r++) {
+		var res = PAYABLE_RESOURCES[r];
+		var have = held[res] || 0;
+		if (have < 1) {
+			continue;
+		}
+		var row = $("<div style='margin:2px 0;'></div>");
+		row.append($("<span style='display:inline-block; width:90px;'></span>").text(res + " (" + have + ")"));
+		row.append($("<input type='number' min='0' class='research-pay-input' style='width:60px;'>")
+			.attr("data-res", res).attr("max", Math.min(3, have)).val(0));
+		rows.append(row);
+	}
+	updateResearchPay();
+	$("#research-modal").modal("show");
+}
+
+function updateResearchPay() {
+	researchPay = {};
+	var held = lastHandData.resources || {};
+	var valid = true;
+	$("#research-pay-rows .research-pay-input").each(function () {
+		var n = parseInt($(this).val(), 10) || 0;
+		var res = $(this).attr("data-res");
+		if (n < 0 || n > (held[res] || 0)) {
+			valid = false;
+		}
+		if (n > 0) {
+			researchPay[res] = n;
+		}
+	});
+	var total = researchPayTotal();
+	$("#research-pay-total").text(total);
+	$("#research-confirm-btn").prop("disabled", !(valid && total === 3));
+}
+
+$(document).on("click", "#tech-tree .tech-available", function () {
+	startResearch($(this).attr("data-node"));
+});
+
+$(document).on("input change", ".research-pay-input", updateResearchPay);
+
+$(document).on("click", "#research-confirm-btn", function () {
+	if (researchPayTotal() !== 3) {
+		return;
+	}
+	sendResearchAction(researchNode, researchPay);
+	$("#research-modal").modal("hide");
+});
+
+// ---- Atomic bombs and forfeiting
+
+var inLaunchMode = false;
+
+function buildBombSection() {
+	var mine = myFactionData();
+	var section = $("<div id='bomb-section' style='margin-top:6px;'></div>");
+	var bombs = lastHandData.numBombs || 0;
+	var hasBombTech = (mine.tech || []).indexOf("unlockAtomicBombs") >= 0;
+	section.append($("<p></p>").append($("<strong></strong>").text("Atomic Bombs: "))
+		.append(document.createTextNode(bombs + " in your hand")));
+	if (hasBombTech) {
+		section.append($("<button type='button' class='btn btn-warning btn-xs' id='buy-bomb-btn'></button>")
+			.text("Buy a bomb (3 uranium + 3 ore, needs a Test Site)"));
+	} else {
+		section.append($("<p class='text-muted' style='font-size:11px;'></p>")
+			.text("Research Unlock Atomic Bombs (Nuclear Weapons) to buy bombs."));
+	}
+	if (bombs > 0) {
+		section.append($("<button type='button' class='btn btn-danger btn-xs' id='launch-bomb-btn'></button>").text("Launch a bomb"));
+	}
+	section.append($("<button type='button' class='btn btn-default btn-xs' id='forfeit-btn'></button>")
+		.attr("title", "Only at the start of your turn, before you roll").text("Forfeit"));
+	return section;
+}
+
+function enterLaunchMode() {
+	exitLaunchMode();
+	inLaunchMode = true;
+	$("#launch-panel").removeClass("hidden");
+	for (var i = 0; i < board.tiles.length; i++) {
+		var tile = board.tiles[i];
+		if (tile.tileType === TILE_TYPE.SEA) {
+			continue;
+		}
+		(function (tile) {
+			var circle = $("#" + tile.id + "-wrapper .number-circle");
+			circle.addClass("number-circle-highlighted launch-tile");
+			circle.off("click.launch").on("click.launch", function () {
+				if (window.confirm("Launch an Atomic Bomb at this tile?")) {
+					sendLaunchBombAction(tile.coordinates);
+					exitLaunchMode();
+				}
+			});
+		})(tile);
+	}
+}
+
+function exitLaunchMode() {
+	inLaunchMode = false;
+	$("#launch-panel").addClass("hidden");
+	$(".launch-tile").off("click.launch").removeClass("number-circle-highlighted launch-tile");
+}
+
+$(document).on("click", "#buy-bomb-btn", function () {
+	sendBuyBombAction();
+});
+
+$(document).on("click", "#launch-bomb-btn", enterLaunchMode);
+$(document).on("click", "#launch-cancel-btn", exitLaunchMode);
+
+$(document).on("click", "#forfeit-btn", function () {
+	if (window.confirm("Forfeit? You will be out of the war.")) {
+		sendForfeitAction();
+	}
+});
+
+
+//////////////////////////////////////////
+// Cursed Catan: war actions (units, movement, combat)
+//////////////////////////////////////////
+
+var warMode = null;   // "build", "move", "entrench", "fight" or null
+var warPick = null;   // the tile chosen first (move, fight)
+var buildChoice = null;
+
+var UNIT_OPTIONS = [
+	{ unit: "infantry", with: "wheat", label: "Infantry (2 wheat)" },
+	{ unit: "infantry", with: "sheep", label: "Infantry (2 sheep)" },
+	{ unit: "artillery", with: "sheep", label: "Artillery (sheep + ore)" },
+	{ unit: "artillery", with: "wheat", label: "Artillery (wheat + ore)" },
+	{ unit: "tank", with: null, label: "Tank (wheat + 2 ore)" },
+	{ unit: "aircraft", with: null, label: "Aircraft (2 wood + ore)" }
+];
+var GROUND_UNITS = ["infantry", "artillery", "tank"];
+
+/*
+ * Whether two tiles touch: the centres of neighbouring tiles are one tile
+ * width apart.
+ */
+function tilesAdjacent(a, b) {
+	function cx(c) { return -0.5 * c.x + c.y - 0.5 * c.z; }
+	function cy(c) { return (Math.sqrt(3) / 2) * (c.z - c.x); }
+	var d = Math.sqrt(Math.pow(cx(a) - cx(b), 2) + Math.pow(cy(a) - cy(b), 2));
+	return Math.abs(d - 1) < 0.01;
+}
+
+function sameCoord(a, b) {
+	return a.x === b.x && a.y === b.y && a.z === b.z;
+}
+
+function isLandTile(tile) {
+	return tile.tileType !== TILE_TYPE.SEA;
+}
+
+/* My faction's units on the tile: {units, canMove, entrenched}, or null. */
+function myUnitsOn(coord) {
+	if (!warData) {
+		return null;
+	}
+	for (var i = 0; i < warData.units.length; i++) {
+		var u = warData.units[i];
+		if (u.faction === warData.myFaction && sameCoord(u, coord)) {
+			return u;
+		}
+	}
+	return null;
+}
+
+function canMoveTotal(coord, groundOnly) {
+	var u = myUnitsOn(coord);
+	var total = 0;
+	if (u) {
+		for (var type in u.canMove) {
+			if (u.canMove.hasOwnProperty(type) && (!groundOnly || GROUND_UNITS.indexOf(type) >= 0)) {
+				total += u.canMove[type];
+			}
+		}
+	}
+	return total;
+}
+
+function iAmEliminated() {
+	var me = playersById[playerId];
+	return !!(me && me.eliminated);
+}
+
+/*
+ * Shows the war actions panel on my turn in the war, and re-marks the tiles
+ * of the current mode (the board is rebuilt on every refresh).
+ */
+function refreshWarActions() {
+	var mine = !!(warData && currentPlayerTurn === playerId && !iAmEliminated()
+		&& !gameStateData_hasWinner());
+	if (!mine) {
+		clearWarMode();
+		$("#war-actions").addClass("hidden");
+		return;
+	}
+	$("#war-actions-faction").empty().append(factionChip(warData.myFaction));
+	$("#war-actions").removeClass("hidden");
+	if (warMode) {
+		markWarTiles();
+	}
+}
+
+function gameStateData_hasWinner() {
+	return $("#winner-modal").hasClass("in");
+}
+
+function setWarMode(mode) {
+	var same = warMode === mode;
+	clearWarMode();
+	if (same) {
+		return;
+	}
+	warMode = mode;
+	warPick = null;
+	$(".war-mode-btn").each(function () {
+		$(this).toggleClass("active", $(this).attr("data-mode") === mode);
+	});
+	renderWarForm();
+	markWarTiles();
+}
+
+function clearWarMode() {
+	warMode = null;
+	warPick = null;
+	$(".war-mode-btn").removeClass("active");
+	$("#war-hint").empty();
+	$("#war-form").empty();
+	$(".war-tile").off("click.war").removeClass("number-circle-highlighted war-tile");
+}
+
+/* Marks the tiles that can be clicked in the current mode. */
+function markWarTiles() {
+	$(".war-tile").off("click.war").removeClass("number-circle-highlighted war-tile");
+	for (var i = 0; i < board.tiles.length; i++) {
+		var tile = board.tiles[i];
+		if (!isLandTile(tile) || !warTileUsable(tile)) {
+			continue;
+		}
+		(function (tile) {
+			var circle = $("#" + tile.id + "-wrapper .number-circle");
+			circle.addClass("number-circle-highlighted war-tile");
+			circle.off("click.war").on("click.war", function () {
+				warTileClicked(tile);
+			});
+		})(tile);
+	}
+}
+
+function warTileUsable(tile) {
+	var c = tile.coordinates;
+	switch (warMode) {
+		case "build":
+			return !!buildChoice;
+		case "move":
+			if (!warPick) {
+				return canMoveTotal(c, false) > 0;
+			}
+			return tilesAdjacent(warPick, c) || (warPickHasAircraft() && !sameCoord(warPick, c));
+		case "entrench":
+			return canMoveTotal(c, true) > 0;
+		case "fight":
+			return !warPick && !!myUnitsOn(c);
+		default:
+			return false;
+	}
+}
+
+function warPickHasAircraft() {
+	var u = warPick ? myUnitsOn(warPick) : null;
+	return !!(u && u.canMove.aircraft > 0);
+}
+
+function warTileClicked(tile) {
+	var c = tile.coordinates;
+	if (warMode === "build") {
+		sendBuildUnitAction(buildChoice.unit, c, buildChoice.with);
+	} else if (warMode === "entrench") {
+		sendEntrenchAction(c);
+		clearWarMode();
+	} else if (warMode === "move") {
+		if (!warPick) {
+			warPick = c;
+			renderWarForm();
+			markWarTiles();
+		} else {
+			var units = {};
+			$("#war-form .war-unit-input").each(function () {
+				var n = parseInt($(this).val(), 10) || 0;
+				if (n > 0) {
+					units[$(this).attr("data-unit")] = n;
+				}
+			});
+			sendMoveUnitsAction(warPick, c, units);
+			clearWarMode();
+		}
+	} else if (warMode === "fight") {
+		warPick = c;
+		renderWarForm();
+		markWarTiles();
+	}
+}
+
+function numberField(unit, max, value) {
+	return $("<input type='number' class='war-unit-input' min='0'>").attr("data-unit", unit).attr("max", max).val(value);
+}
+
+function renderWarForm() {
+	var form = $("#war-form").empty();
+	var hint = $("#war-hint").empty();
+	if (warMode === "build") {
+		hint.text(buildChoice ? "Click a tile next to one of your buildings." : "Choose a unit, then click a tile.");
+		for (var i = 0; i < UNIT_OPTIONS.length; i++) {
+			var o = UNIT_OPTIONS[i];
+			var btn = $("<button type='button' class='btn btn-default btn-xs build-unit-btn' style='margin:1px;'></button>")
+				.text(o.label).attr("data-index", i);
+			if (buildChoice && buildChoice.unit === o.unit && buildChoice.with === o.with) {
+				btn.addClass("active");
+			}
+			form.append(btn);
+		}
+	} else if (warMode === "move") {
+		if (!warPick) {
+			hint.text("Click a tile with units that can move.");
+		} else {
+			hint.text("Choose how many to move, then click the tile they go to (one tile away; aircraft go anywhere).");
+			var u = myUnitsOn(warPick);
+			for (var type in u.canMove) {
+				if (u.canMove.hasOwnProperty(type) && u.canMove[type] > 0) {
+					form.append($("<div class='war-field'></div>").append(document.createTextNode(type + " (" + u.canMove[type] + ") "))
+						.append(numberField(type, u.canMove[type], u.canMove[type])));
+				}
+			}
+		}
+	} else if (warMode === "entrench") {
+		hint.text("Click a tile with ground troops that have not moved this turn. Entrenched defenders make attackers roll -1.");
+	} else if (warMode === "fight") {
+		if (!warPick) {
+			hint.text("Click a tile where your units are.");
+		} else {
+			hint.text("Choose which units attack buildings (the rest fight troops), then Fight.");
+			var mine = myUnitsOn(warPick);
+			var total = mine ? mine.units : {};
+			for (var t in total) {
+				if (total.hasOwnProperty(t)) {
+					form.append($("<div class='war-field'></div>").append(document.createTextNode(t + " (" + total[t] + ") attack buildings: "))
+						.append(numberField(t, total[t], 0)));
+				}
+			}
+			var select = $("<select id='war-enemy' class='form-control input-sm' style='margin:4px 0;'></select>")
+				.append($("<option value=''></option>").text("Enemy: automatic"));
+			for (var f = 0; f < warData.factions.length; f++) {
+				if (warData.factions[f].name !== warData.myFaction) {
+					select.append($("<option></option>").val(warData.factions[f].name).text("Enemy: " + warData.factions[f].name));
+				}
+			}
+			form.append(select);
+			form.append($("<button type='button' class='btn btn-danger btn-xs' id='war-fight-btn'></button>").text("Fight!"));
+		}
+	}
+}
+
+$(document).on("click", ".war-mode-btn", function () {
+	setWarMode($(this).attr("data-mode"));
+});
+
+$(document).on("click", "#war-cancel-btn", clearWarMode);
+
+$(document).on("click", ".build-unit-btn", function () {
+	buildChoice = UNIT_OPTIONS[parseInt($(this).attr("data-index"), 10)];
+	renderWarForm();
+	markWarTiles();
+});
+
+$(document).on("click", "#war-fight-btn", function () {
+	var buildings = {};
+	$("#war-form .war-unit-input").each(function () {
+		var n = parseInt($(this).val(), 10) || 0;
+		if (n > 0) {
+			buildings[$(this).attr("data-unit")] = n;
+		}
+	});
+	sendDeclareCombatAction(warPick, buildings, $("#war-enemy").val());
+	clearWarMode();
 });

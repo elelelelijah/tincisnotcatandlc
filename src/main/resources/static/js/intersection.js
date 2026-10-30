@@ -173,6 +173,26 @@ Intersection.prototype.draw = function (transX, transY, scale) {
 			break;
 	}
 
+	// Cursed Catan: show ruins, occupation and damage
+	if (this.building !== BUILDING.NONE && this.building !== BUILDING.KNIGHT) {
+		var notes = [];
+		if (this.ruined) {
+			element.css("opacity", "0.45");
+			element.css("filter", "grayscale(100%)");
+			notes.push("In ruins");
+		}
+		if (this.occupiedBy) {
+			element.css("outline", "2px dashed #b00");
+			notes.push("Occupied by " + this.occupiedBy);
+		}
+		if (this.maxHp) {
+			notes.push("HP " + this.hp + "/" + this.maxHp);
+		}
+		if (notes.length > 0) {
+			element.attr("title", notes.join(" \u00b7 "));
+		}
+	}
+
 	// Calculate size and displacement of selectable area
 	var size = scale * SELECTABLE_AREA_SCALE;
 	var x = transX + displacement.x * scale + Math.sqrt(3) * scale / 4 - size / 4 - 0.020 * scale;
@@ -343,6 +363,11 @@ function parseIntersection(data) {
 
 	if (data.hasOwnProperty("building")) {
 		var player = playersById[data.building.player];
+		// Cursed Catan: ruins, damage and occupation
+		intersect.ruined = !!data.building.ruined;
+		intersect.occupiedBy = data.building.occupiedBy || null;
+		intersect.hp = data.building.hp;
+		intersect.maxHp = data.building.maxHp;
 		if (data.building.type === "settlement") {
 			intersect.addSettlement(player);
 		} else if (data.building.type === "city") {

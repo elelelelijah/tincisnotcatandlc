@@ -263,6 +263,54 @@ function sendMoveRobberAction(coord) {
 	webSocket.send(JSON.stringify(dropReq));
 }
 
+function sendResearchAction(node, pay) {
+	var req = {
+		requestType: "action",
+		action: "research",
+		node: node
+	};
+	if (pay) {
+		req.pay = pay;
+	}
+	webSocket.send(JSON.stringify(req));
+}
+
+function sendBuyBombAction() {
+	webSocket.send(JSON.stringify({ requestType: "action", action: "buyBomb" }));
+}
+
+function sendLaunchBombAction(tileCoord) {
+	webSocket.send(JSON.stringify({ requestType: "action", action: "launchBomb", tile: tileCoord }));
+}
+
+function sendForfeitAction() {
+	webSocket.send(JSON.stringify({ requestType: "action", action: "forfeit" }));
+}
+
+function sendBuildUnitAction(unit, tileCoord, withResource) {
+	var req = { requestType: "action", action: "buildUnit", unit: unit, tile: tileCoord };
+	if (withResource) {
+		req.with = withResource;
+	}
+	webSocket.send(JSON.stringify(req));
+}
+
+function sendMoveUnitsAction(fromCoord, toCoord, units) {
+	webSocket.send(JSON.stringify({ requestType: "action", action: "moveUnits", from: fromCoord, to: toCoord, units: units }));
+}
+
+function sendEntrenchAction(tileCoord) {
+	webSocket.send(JSON.stringify({ requestType: "action", action: "entrench", tile: tileCoord }));
+}
+
+function sendDeclareCombatAction(tileCoord, buildings, enemy) {
+	var req = { requestType: "action", action: "declareCombat", tile: tileCoord, buildings: buildings };
+	if (enemy) {
+		req.enemy = enemy;
+	}
+	webSocket.send(JSON.stringify(req));
+}
+
 function sendDeployUnitsAction(placements) {
 	var req = {
 		requestType: "action",
@@ -918,6 +966,7 @@ function handleGetGameState(gameStateData) {
 	// Cursed Catan: the March of Industry
 	industryTrack = gameStateData.industryTrack || 0;
 	warData = gameStateData.war || null;
+	lastHandData = gameStateData.hand || {};
 	longestTurnPlayerId = (gameStateData.longestTurnPlayer !== undefined) ? gameStateData.longestTurnPlayer : -1;
 	longestTurnSeconds = gameStateData.longestTurnSeconds || 0;
 	greatWarTriggered = !!gameStateData.greatWarTriggered;
@@ -935,6 +984,11 @@ function handleGetGameState(gameStateData) {
 	board.createBoard(gameStateData.board);
 	board.draw();
 	drawWarUnits();
+	if (inLaunchMode) {
+		// the board was just rebuilt; mark the tiles again
+		enterLaunchMode();
+	}
+	refreshWarActions();
 
 	// C&K: Update Barbarian Track with animation
 	if (gameStateData.barbarianTrack && gameSettings.isCitiesAndKnights) {
