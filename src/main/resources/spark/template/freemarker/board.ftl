@@ -775,6 +775,47 @@
 	<button type="button" class="btn btn-primary btn-xs" id="deploy-confirm-btn" disabled>Confirm deployment</button>
 </div>
 
+<!-- Cursed Catan: choose a tile to strike with an Atomic Bomb -->
+<div id="launch-panel" class="hidden">
+	<div><strong>Atomic Bomb</strong>: click the tile to strike.</div>
+	<button type="button" class="btn btn-default btn-xs" id="launch-cancel-btn">Cancel</button>
+</div>
+
+<!-- Cursed Catan: pay for a Research Point -->
+<div class="modal fade" id="research-modal" tabindex="-1" role="dialog">
+	<div class="modal-dialog" role="document">
+		<div class="modal-content">
+			<div class="modal-header">
+				<button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+				<h4 class="modal-title">Research: <span id="research-node-name"></span></h4>
+			</div>
+			<div class="modal-body">
+				<p>A Research Point costs <strong>3 resources of your choice</strong>.</p>
+				<div id="research-pay-rows"></div>
+				<p>Chosen: <strong id="research-pay-total">0</strong> / 3</p>
+			</div>
+			<div class="modal-footer">
+				<button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
+				<button type="button" class="btn btn-primary" id="research-confirm-btn" disabled>Research</button>
+			</div>
+		</div>
+	</div>
+</div>
+
+<!-- Cursed Catan: Great War actions (build units, move, entrench, fight) -->
+<div id="war-actions" class="hidden">
+	<div><strong>War actions</strong> <span id="war-actions-faction"></span></div>
+	<div id="war-mode-buttons">
+		<button type="button" class="btn btn-default btn-xs war-mode-btn" data-mode="build">Build unit</button>
+		<button type="button" class="btn btn-default btn-xs war-mode-btn" data-mode="move">Move</button>
+		<button type="button" class="btn btn-default btn-xs war-mode-btn" data-mode="entrench">Entrench</button>
+		<button type="button" class="btn btn-default btn-xs war-mode-btn" data-mode="fight">Fight</button>
+		<button type="button" class="btn btn-link btn-xs" id="war-cancel-btn">Cancel</button>
+	</div>
+	<div id="war-hint" class="text-muted" style="font-size:12px; margin-top:4px;"></div>
+	<div id="war-form" style="margin-top:4px;"></div>
+</div>
+
 <!-- Modals -->
 
 <div class="modal fade" id="buy-dev-card-modal" tabindex="-1" role="dialog" aria-labelledby="buyDevCardLabel">
