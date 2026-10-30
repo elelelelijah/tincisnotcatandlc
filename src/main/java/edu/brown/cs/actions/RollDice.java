@@ -621,8 +621,14 @@ public class RollDice implements FollowUpAction {
 
   // The robber stops a tile paying out, except to players who have a fortress
   // on it.
-  private static boolean blockedByRobber(Tile tile, int playerID) {
-    return tile.hasRobber() && !tile.hasFortress(playerID);
+  private boolean blockedByRobber(Tile tile, int playerID) {
+    if (tile.hasRobber() && !tile.hasFortress(playerID)) {
+      return true;
+    }
+    // Great War: a tile holding enemy ground troops produces nothing
+    return _ref != null && _ref.isWarActive()
+        && _ref.getWarState().hasEnemyUnits(tile.getCoordinate(),
+            _ref.getFaction(playerID), true);
   }
 
   @Override
