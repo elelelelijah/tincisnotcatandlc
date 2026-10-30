@@ -921,3 +921,120 @@ body {
 #war-panel .morale-row {
 	margin: 2px 0;
 }
+
+
+/* Cursed Catan: Military Technology tree and bombs (placeholder styling) */
+#launch-panel {
+	position: fixed;
+	top: 70px;
+	left: 50%;
+	transform: translateX(-50%);
+	z-index: 1000;
+	background: #fff;
+	border: 1px solid #a33;
+	border-radius: 6px;
+	padding: 8px 14px;
+	box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+	text-align: center;
+}
+
+#war-panel {
+	max-width: 215px;
+}
+
+#tech-wrap {
+	overflow-x: auto;
+}
+
+#tech-tree {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	align-items: flex-start;
+	font-size: 10px;
+	margin-top: 4px;
+}
+
+#tech-tree .tech-block {
+	display: flex;
+	flex-direction: column;
+	align-items: stretch;
+}
+
+#tech-tree .tech-lines {
+	display: flex;
+	gap: 4px;
+}
+
+#tech-tree .tech-line {
+	display: flex;
+	flex-direction: column;
+	width: 64px;
+}
+
+#tech-tree .tech-line-title {
+	text-align: center;
+	font-weight: bold;
+	margin: 2px 0;
+}
+
+#tech-tree .tech-node {
+	border: 1px solid #444;
+	border-radius: 6px;
+	padding: 1px 2px;
+	margin: 2px 0;
+	text-align: center;
+	min-height: 40px;
+	line-height: 1.15;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+#tech-tree .tech-done {
+	background: #2f6b3a;
+	color: #fff;
+}
+
+#tech-tree .tech-available {
+	background: #ffe08a;
+	cursor: pointer;
+	border-width: 2px;
+}
+
+#tech-tree .tech-locked {
+	background: #e6e6e6;
+	color: #888;
+}
+
+#bomb-section .btn {
+	margin: 2px 2px 2px 0;
+}
+
+
+/* Cursed Catan: Great War actions (placeholder styling) */
+#war-actions {
+	position: fixed;
+	left: 10px;
+	top: 110px;
+	width: 250px;
+	z-index: 900;
+	background: #fff;
+	border: 1px solid #888;
+	border-radius: 6px;
+	padding: 8px 10px;
+	box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+#war-actions .war-mode-btn.active {
+	background: #333;
+	color: #fff;
+}
+
+#war-actions .war-field {
+	margin: 2px 0;
+}
+
+#war-actions .war-field input[type=number] {
+	width: 56px;
+}
