@@ -45,6 +45,18 @@ public class TileStructure {
     return _hitPoints;
   }
 
+  /**
+   * Takes hit points away (not below zero).
+   *
+   * @param damage
+   *          How many hit points to remove.
+   * @return The hit points left.
+   */
+  public int damage(int damage) {
+    _hitPoints = Math.max(0, _hitPoints - damage);
+    return _hitPoints;
+  }
+
   @Override
   public String toString() {
     return String.format("%s (owner %d, %d HP)", _kind, _ownerID, _hitPoints);

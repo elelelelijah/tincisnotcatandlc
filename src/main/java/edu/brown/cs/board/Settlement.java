@@ -25,6 +25,34 @@ public class Settlement implements Building {
     _ruined = ruined;
   }
 
+  private int _hp = -1;
+  private edu.brown.cs.catan.Faction _occupier = null;
+
+  @Override
+  public int getMaxHp() {
+    return 4;
+  }
+
+  @Override
+  public int getHp() {
+    return _hp < 0 ? getMaxHp() : _hp;
+  }
+
+  @Override
+  public void setHp(int hp) {
+    _hp = Math.max(0, hp);
+  }
+
+  @Override
+  public edu.brown.cs.catan.Faction getOccupier() {
+    return _occupier;
+  }
+
+  @Override
+  public void setOccupier(edu.brown.cs.catan.Faction faction) {
+    _occupier = faction;
+  }
+
   private Player _player;
 
   /**

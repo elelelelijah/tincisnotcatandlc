@@ -2,6 +2,8 @@ package edu.brown.cs.board;
 
 import java.util.Map;
 
+import edu.brown.cs.catan.Faction;
+
 import edu.brown.cs.catan.Player;
 import edu.brown.cs.catan.Resource;
 
@@ -46,5 +48,36 @@ public interface Building {
   default void setRuined(boolean ruined) {
     throw new UnsupportedOperationException(
         "This building cannot be ruined.");
+  }
+
+  /**
+   * Hit points of the building when it is whole (Cursed Catan).
+   */
+  default int getMaxHp() {
+    return 0;
+  }
+
+  /**
+   * The hit points the building has left.
+   */
+  default int getHp() {
+    return getMaxHp();
+  }
+
+  default void setHp(int hp) {
+    throw new UnsupportedOperationException(
+        "This building has no hit points.");
+  }
+
+  /**
+   * The faction that occupies this (ruined) building, or null.
+   */
+  default Faction getOccupier() {
+    return null;
+  }
+
+  default void setOccupier(Faction faction) {
+    throw new UnsupportedOperationException(
+        "This building cannot be occupied.");
   }
 }

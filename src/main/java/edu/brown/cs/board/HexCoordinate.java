@@ -107,4 +107,18 @@ public class HexCoordinate {
   public String toString() {
     return String.format("( %d, %d, %d)", x, y, z);
   }
+
+  /**
+   * Whether the other tile touches this one (the centres of neighbouring tiles
+   * are exactly one tile width apart).
+   *
+   * @param other
+   *          The other tile.
+   * @return True if the two tiles are next to each other.
+   */
+  public boolean isAdjacentTo(HexCoordinate other) {
+    double dx = cartesianX() - other.cartesianX();
+    double dy = cartesianY() - other.cartesianY();
+    return Math.abs(Math.hypot(dx, dy) - 1.0) < 0.01;
+  }
 }

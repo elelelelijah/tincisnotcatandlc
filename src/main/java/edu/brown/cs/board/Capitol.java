@@ -26,6 +26,11 @@ public class Capitol extends City {
   }
 
   @Override
+  public int getMaxHp() {
+    return 12;
+  }
+
+  @Override
   public Map<Integer, Map<Resource, Integer>> collectResource(Resource resource) {
     if (isRuined()) {
       return new HashMap<Integer, Map<Resource, Integer>>();
