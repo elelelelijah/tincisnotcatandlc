@@ -29,6 +29,7 @@ import edu.brown.cs.actions.Forfeit;
 import edu.brown.cs.actions.LaunchBomb;
 import edu.brown.cs.actions.Research;
 import edu.brown.cs.actions.Rebuild;
+import edu.brown.cs.actions.PlayWarCard;
 import edu.brown.cs.actions.PlayBorderRaid;
 import edu.brown.cs.actions.PlayKnight;
 import edu.brown.cs.actions.PlayMonopoly;
@@ -144,6 +145,8 @@ public class ActionFactory {
           return new Rebuild(_referee, playerID,
               toIntersectionCoordinate(actionJSON.get("coordinate")
                   .getAsJsonObject()), actionJSON);
+        case PlayWarCard.ID:
+          return new PlayWarCard(_referee, playerID, actionJSON);
         case Research.ID:
           return new Research(_referee, playerID, actionJSON);
         case BuyBomb.ID:
