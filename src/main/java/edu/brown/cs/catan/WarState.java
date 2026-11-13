@@ -39,6 +39,7 @@ public class WarState {
   private final Map<HexCoordinate, Map<Faction, Map<UnitType, Integer>>> _built = new LinkedHashMap<>();
   private final Map<HexCoordinate, Set<Faction>> _entrenched = new LinkedHashMap<>();
   private final Set<HexCoordinate> _fought = new HashSet<>();
+  private final Map<HexCoordinate, Integer> _devastation = new LinkedHashMap<>();
   private final Map<Faction, Set<Tech>> _tech = new EnumMap<>(Faction.class);
   private final Map<Faction, Integer> _banked = new EnumMap<>(Faction.class);
 
@@ -509,5 +510,63 @@ public class WarState {
 
   public void markFought(HexCoordinate tile) {
     _fought.add(tile);
+  }
+
+  // ------------------------------------------------------------ devastation
+
+  /** Devastation points on the tile. */
+  public int getDevastation(HexCoordinate tile) {
+    Integer n = _devastation.get(tile);
+    return n == null ? 0 : n;
+  }
+
+  public Map<HexCoordinate, Integer> getDevastation() {
+    return java.util.Collections.unmodifiableMap(_devastation);
+  }
+
+  public static final int DEVASTATION_LIMIT = 3;
+
+  /**
+   * Adds a Devastation point. At 3 the tile becomes wasteland (the caller
+   * changes the tile; the points are cleared here).
+   *
+   * @return True if the tile has now become wasteland.
+   */
+  public boolean addDevastation(HexCoordinate tile) {
+    int now = getDevastation(tile) + 1;
+    if (now >= DEVASTATION_LIMIT) {
+      _devastation.remove(tile);
+      return true;
+    }
+    _devastation.put(tile, now);
+    return false;
+  }
+
+  /** Rolling a devastated tile's number takes away one point. */
+  public void removeDevastation(HexCoordinate tile) {
+    int now = getDevastation(tile) - 1;
+    if (now <= 0) {
+      _devastation.remove(tile);
+    } else {
+      _devastation.put(tile, now);
+    }
+  }
+
+  /** The factions that have at least one unit on the tile. */
+  public Set<Faction> getFactionsPresent(HexCoordinate tile) {
+    Set<Faction> present = new HashSet<>();
+    Map<Faction, Map<UnitType, Integer>> onTile = _units.get(tile);
+    if (onTile != null) {
+      for (Map.Entry<Faction, Map<UnitType, Integer>> e : onTile.entrySet()) {
+        int n = 0;
+        for (int v : e.getValue().values()) {
+          n += v;
+        }
+        if (n > 0) {
+          present.add(e.getKey());
+        }
+      }
+    }
+    return present;
   }
 }

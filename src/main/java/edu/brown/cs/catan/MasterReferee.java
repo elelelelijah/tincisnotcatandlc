@@ -30,6 +30,7 @@ import edu.brown.cs.board.City;
 import edu.brown.cs.board.Factory;
 import edu.brown.cs.board.Intersection;
 import edu.brown.cs.board.Tile;
+import edu.brown.cs.board.TileStructure;
 import edu.brown.cs.board.TileType;
 import edu.brown.cs.gamestats.CatanStats;
 import edu.brown.cs.gamestats.GameStats;
@@ -65,6 +66,12 @@ public class MasterReferee implements Referee {
   private final Map<Integer, Integer> _coalOwed = new HashMap<>();
   private final Map<Integer, Map<UnitType, Integer>> _toDeploy = new HashMap<>();
   private final Set<Integer> _eliminated = new HashSet<>();
+  private static final int WAR_WIN_POINTS = 5;
+  private final Set<Integer> _sanctionedPlayers = new HashSet<>();
+  private boolean _warEnded = false;
+  private final Set<Integer> _warWinners = new HashSet<>();
+  private String _warOutcome = null;
+  private String _warEndMessage = null;
   private final Bank _bank;
   private final List<DevelopmentCard> _devCardDeck;
   private final GameSettings _gameSettings;
@@ -240,6 +247,7 @@ public class MasterReferee implements Referee {
   @Override
   public void startNextTurn() {
     recordLongestTurn();
+    checkWarEnd();
     _spyNetworkActive = false;
     if (_war != null) {
       _war.clearTurnFlags();
@@ -248,7 +256,8 @@ public class MasterReferee implements Referee {
     Player nextPlayer = _players.get(_turnOrder.get(turnNum
         % _gameSettings.numPlayers));
     // Eliminated players take no more turns
-    for (int tries = 0; _war != null && tries < _gameSettings.numPlayers
+    for (int tries = 0; (_war != null || !_eliminated.isEmpty())
+        && tries < _gameSettings.numPlayers
         && isEliminated(nextPlayer.getID()); tries++) {
       turnNum++;
       nextPlayer = _players.get(_turnOrder.get(turnNum
@@ -680,6 +689,9 @@ public class MasterReferee implements Referee {
 
   @Override
   public boolean isSanctioned(int playerID) {
+    if (_sanctionedPlayers.contains(playerID)) {
+      return true;
+    }
     return _war != null && _war.getSanctioned() != null
         && _war.getFaction(playerID) == _war.getSanctioned();
   }
@@ -709,11 +721,11 @@ public class MasterReferee implements Referee {
 
   @Override
   public boolean isEliminated(int playerID) {
-    if (_war == null) {
-      return false;
-    }
     if (_eliminated.contains(playerID)) {
       return true;
+    }
+    if (_war == null) {
+      return false;
     }
     Player p = getPlayerByID(playerID);
     return p != null && !hasLivingBuilding(p);
@@ -727,7 +739,7 @@ public class MasterReferee implements Referee {
   }
 
   private boolean allEliminated() {
-    if (_war == null || _players.isEmpty()) {
+    if ((_war == null && _eliminated.isEmpty()) || _players.isEmpty()) {
       return false;
     }
     for (Player p : _players.values()) {
@@ -736,6 +748,194 @@ public class MasterReferee implements Referee {
       }
     }
     return true;
+  }
+
+  // ------------------------------------------------- devastation and morale
+
+  private static boolean canBeDevastated(Tile t) {
+    TileType type = t.getType();
+    return type != TileType.SEA && type != TileType.DESERT
+        && type != TileType.WASTELAND;
+  }
+
+  /**
+   * A 7 in the Great War: every tile where troops of two or more factions
+   * stand gets 1 Devastation (at 3 it becomes wasteland), then every faction's
+   * Morale changes (see {@link WarMorale}).
+   */
+  @Override
+  public String resolveWarSeven() {
+    if (_war == null) {
+      return "";
+    }
+    StringBuilder what = new StringBuilder();
+    int hit = 0;
+    int wastelands = 0;
+    for (Tile t : _board.getTiles()) {
+      if (canBeDevastated(t)
+          && _war.getFactionsPresent(t.getCoordinate()).size() >= 2) {
+        hit++;
+        if (_war.addDevastation(t.getCoordinate())) {
+          t.setType(TileType.WASTELAND);
+          t.setRollNumber(0);
+          wastelands++;
+        }
+      }
+    }
+    if (hit > 0) {
+      what.append(String.format("%d tile%s devastated", hit, hit == 1 ? ""
+          : "s"));
+      if (wastelands > 0) {
+        what.append(String.format(" (%d became wasteland)", wastelands));
+      }
+      what.append(". ");
+    }
+    StringBuilder morale = new StringBuilder();
+    for (Map.Entry<Faction, Integer> e : WarMorale.changes(this).entrySet()) {
+      int now = _war.changeMorale(e.getKey(), e.getValue());
+      if (morale.length() > 0) {
+        morale.append(", ");
+      }
+      morale.append(String.format("%s %s%d (now %d)", e.getKey(),
+          e.getValue() >= 0 ? "+" : "", e.getValue(), now));
+    }
+    what.append("Morale: ").append(morale).append(".");
+    return what.toString();
+  }
+
+  // ----------------------------------------------------------- ending the war
+
+  @Override
+  public String takeWarEndMessage() {
+    String m = _warEndMessage;
+    _warEndMessage = null;
+    return m;
+  }
+
+  @Override
+  public String getWarOutcome() {
+    return _warOutcome;
+  }
+
+  /**
+   * At the end of a turn the war is over if a faction's Morale is 0 or all of
+   * a faction's buildings are occupied or destroyed.
+   */
+  private void checkWarEnd() {
+    if (_war == null) {
+      return;
+    }
+    boolean zero = false;
+    java.util.Set<Faction> wiped = new HashSet<>();
+    for (Faction f : _war.getFactionList()) {
+      if (_war.getMorale(f) <= 0) {
+        zero = true;
+      }
+      boolean standing = false;
+      for (int id : _war.getPlayersOf(f)) {
+        if (hasLivingBuilding(getPlayerByID(id))) {
+          standing = true;
+        }
+      }
+      if (!standing) {
+        wiped.add(f);
+      }
+    }
+    if (zero || !wiped.isEmpty()) {
+      endWar(wiped);
+    }
+  }
+
+  /**
+   * The faction with the highest Morale among those still standing wins; a
+   * tie is a stalemate. Winners' players get 5 VP. Then everything that
+   * belongs to the war is cleaned up and normal play resumes.
+   */
+  private void endWar(java.util.Set<Faction> wiped) {
+    Faction winner = null;
+    int best = -1;
+    int holders = 0;
+    for (Faction f : _war.getFactionList()) {
+      if (wiped.contains(f)) {
+        continue;
+      }
+      int m = _war.getMorale(f);
+      if (m > best) {
+        best = m;
+        winner = f;
+        holders = 1;
+      } else if (m == best) {
+        holders++;
+      }
+    }
+    String outcome;
+    if (winner != null && holders == 1) {
+      for (int id : _war.getPlayersOf(winner)) {
+        _warWinners.add(id);
+      }
+      outcome = String.format(
+          "THE WAR IS OVER: %s wins (each of its players gets 5 VP).", winner);
+    } else {
+      outcome = "THE WAR IS OVER: it ends in a stalemate (no war points).";
+    }
+    // Players with nothing left stay eliminated
+    for (Player p : _players.values()) {
+      if (isEliminated(p.getID())) {
+        _eliminated.add(p.getID());
+      }
+    }
+    // Cleanup: markers, test sites and bombs go; Sanctions stay (kept in the
+    // war state's faction, which is gone, so remember who is sanctioned)
+    for (Tile t : _board.getTiles()) {
+      for (int owner : new ArrayList<>(playersWithTestSite(t))) {
+        t.removeStructure(TileStructure.Kind.TEST_SITE, owner);
+      }
+      for (Intersection i : t.getIntersections()) {
+        Building b = i.getBuilding();
+        if (b != null && b.getOccupier() != null) {
+          b.setOccupier(null);
+        }
+      }
+    }
+    for (Player p : _players.values()) {
+      if (_war.getSanctioned() != null
+          && _war.getFaction(p.getID()) == _war.getSanctioned()) {
+        _sanctionedPlayers.add(p.getID());
+      }
+      p.clearWarPieces();
+    }
+    // The robber returns to a desert or wasteland
+    List<Tile> spots = new ArrayList<>();
+    for (Tile t : _board.getTiles()) {
+      if (t.getType() == TileType.DESERT || t.getType() == TileType.WASTELAND) {
+        spots.add(t);
+      }
+    }
+    if (spots.isEmpty()) {
+      for (Tile t : _board.getTiles()) {
+        if (t.getType() != TileType.SEA) {
+          spots.add(t);
+        }
+      }
+    }
+    if (!spots.isEmpty()) {
+      _board.placeRobber(spots.get(_random.nextInt(spots.size()))
+          .getCoordinate());
+    }
+    _war = null;
+    _warEnded = true;
+    _warOutcome = outcome;
+    _warEndMessage = outcome;
+  }
+
+  private List<Integer> playersWithTestSite(Tile t) {
+    List<Integer> owners = new ArrayList<>();
+    for (TileStructure s : t.getStructures()) {
+      if (s.getKind() == TileStructure.Kind.TEST_SITE) {
+        owners.add(s.getOwnerID());
+      }
+    }
+    return owners;
   }
 
   // ------------------------------------------------------------ atomic bombs
@@ -1016,6 +1216,10 @@ public class MasterReferee implements Referee {
         cursedPoints -= Settings.CURSED_LONGEST_TURN_PENALTY;
       }
       cursedPoints -= occupiedPoints(player);
+      if (_warWinners.contains(id)) {
+        // +5 for each player of the faction that won the war
+        cursedPoints += WAR_WIN_POINTS;
+      }
     }
 
     return settlementPoints + cityPoints + roadArmyPts + ckPoints
@@ -1074,7 +1278,7 @@ public class MasterReferee implements Referee {
       return getDrawWinner();
     }
     // Great War: the last player standing wins
-    if (_war != null && _players.size() > 1) {
+    if ((_war != null || !_eliminated.isEmpty()) && _players.size() > 1) {
       Player survivor = null;
       int alive = 0;
       for (Player p : _players.values()) {
@@ -1207,6 +1411,11 @@ public class MasterReferee implements Referee {
     @Override
     public boolean isWarActive() {
       return _referee.isWarActive();
+    }
+
+    @Override
+    public String getWarOutcome() {
+      return _referee.getWarOutcome();
     }
 
     @Override

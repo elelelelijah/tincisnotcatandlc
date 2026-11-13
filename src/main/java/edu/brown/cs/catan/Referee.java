@@ -285,4 +285,27 @@ public interface Referee {
   default boolean hasTech(int playerID, Tech tech) {
     return false;
   }
+
+  /**
+   * A 7 was rolled in the Great War: Devastation spreads and Morale changes.
+   *
+   * @return What happened, for the message to the players.
+   */
+  default String resolveWarSeven() {
+    return "";
+  }
+
+  /**
+   * The news that the war has just ended, handed over once (or null).
+   */
+  default String takeWarEndMessage() {
+    return null;
+  }
+
+  /**
+   * How the war ended (kept for the rest of the game), or null.
+   */
+  default String getWarOutcome() {
+    return null;
+  }
 }

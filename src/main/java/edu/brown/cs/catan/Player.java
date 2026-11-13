@@ -184,6 +184,12 @@ public interface Player {
   }
 
   /**
+   * The war is over: Atomic Bombs and Test Sites are taken away.
+   */
+  default void clearWarPieces() {
+  }
+
+  /**
    * How many Atomic Bombs the player holds (kept off-hand, Cursed Catan).
    */
   default int numBombs() {
