@@ -1334,6 +1334,11 @@ function drawIndustryTrack() {
 		drawWarPanel();
 		return;
 	}
+	if (warOutcome) {
+		// The war is over; the Industry track is no more
+		drawWarOutcome();
+		return;
+	}
 	if (!industryTrack) {
 		return;
 	}
@@ -1608,6 +1613,7 @@ function exitCKBuildModes() {
 	if (inBuildCapitolMode) exitBuildCapitolMode();
 	if (inBuildFortressMode) exitBuildFortressMode();
 	if (inBuildTestSiteMode) exitBuildTestSiteMode();
+	if (inRebuildMode) exitRebuildMode();
 }
 
 /*
@@ -2605,6 +2611,8 @@ function exitBorderRaidMode() {
 var warData = null;
 // The player's hand from the latest state (resources, bombs, ...)
 var lastHandData = {};
+// How the war ended, once it is over
+var warOutcome = null;
 
 var NUCLEAR_WINTER_ROLLS = [null, null, "6", "5-6", "4-6", "3-6", "2-6"];
 var NUCLEAR_WINTER_NOTES = {
@@ -2685,8 +2693,16 @@ function drawWarPanel() {
  */
 function drawWarUnits() {
 	$(".tile-units").remove();
+	$(".tile-devastation").remove();
 	if (!warData) {
 		return;
+	}
+	for (var d = 0; d < (warData.devastation || []).length; d++) {
+		var dev = warData.devastation[d];
+		var devId = "tile-x-" + dev.x + "y-" + dev.y + "z-" + dev.z;
+		$("#" + devId + "-wrapper").append($("<div class='tile-devastation'></div>")
+			.append($("<span></span>").attr("title", "Devastation: at 3 the tile becomes wasteland, and it produces nothing meanwhile")
+				.text("devastated " + dev.points + "/3")));
 	}
 	var byTile = {};
 	for (var i = 0; i < warData.units.length; i++) {
@@ -3357,4 +3373,71 @@ $(document).on("click", "#war-fight-btn", function () {
 	});
 	sendDeclareCombatAction(warPick, buildings, $("#war-enemy").val());
 	clearWarMode();
+});
+
+
+function drawWarOutcome() {
+	$("#war-panel").remove();
+	$("#war-outcome").remove();
+	$("#game-stats-container").append($("<p id='war-outcome'></p>").text(warOutcome));
+}
+
+// ---- Rebuilding and repairing
+
+var inRebuildMode = false;
+
+function damagedOwnBuildings() {
+	var list = [];
+	for (var i = 0; i < board.intersections.length; i++) {
+		var inter = board.intersections[i];
+		if (inter.building !== BUILDING.NONE && inter.building !== BUILDING.KNIGHT && inter.player
+			&& inter.player.id === playerId && !inter.occupiedBy
+			&& (inter.ruined || (inter.maxHp && inter.hp < inter.maxHp))) {
+			list.push(inter);
+		}
+	}
+	return list;
+}
+
+function enterRebuildMode() {
+	exitBuildMode();
+	var list = damagedOwnBuildings();
+	if (list.length === 0) {
+		addMessage("You have no ruined or damaged buildings that you can rebuild (an occupied building must be liberated first).");
+		return;
+	}
+	for (var i = 0; i < list.length; i++) {
+		list[i].highlight();
+	}
+	inRebuildMode = true;
+	$("#rebuild-btn").removeClass("btn-default").addClass("btn-danger").val("Cancel");
+	addMessage("Click a ruined or damaged building of yours to rebuild or repair it.");
+}
+
+function exitRebuildMode() {
+	inRebuildMode = false;
+	$("#rebuild-btn").removeClass("btn-danger").addClass("btn-default").val("Rebuild / Repair");
+	unHighlightAllIntersections();
+}
+
+/*
+ * Cities and factories can be paid for in two ways; ask which.
+ */
+function handleRebuildClick(inter) {
+	var how = null;
+	if (inter.building === BUILDING.CITY) {
+		how = window.confirm("Pay with ore? OK = 1 brick + 1 ore. Cancel = 1 brick + 1 concrete.") ? "ore" : "concrete";
+	} else if (inter.building === BUILDING.FACTORY) {
+		how = window.confirm("Pay with brick? OK = 2 brick. Cancel = 2 concrete.") ? "brick" : "concrete";
+	}
+	sendRebuildAction(inter.intersectCoordinates, how);
+	exitRebuildMode();
+}
+
+$("#rebuild-btn").click(function () {
+	if (inRebuildMode) {
+		exitRebuildMode();
+	} else {
+		enterRebuildMode();
+	}
 });

@@ -271,6 +271,11 @@ Intersection.prototype.createIntersectionClickHandler = function () {
 			exitRelocateKnightMode();
 			return;
 		}
+		// Cursed Catan: rebuild a ruin or repair a damaged building
+		if (inRebuildMode) {
+			handleRebuildClick(that);
+			return;
+		}
 		// Cursed Catan: upgrade a settlement to a factory, or a city to a capitol
 		if (inBuildFactoryMode) {
 			sendBuildFactoryAction(that.intersectCoordinates);

@@ -287,6 +287,14 @@ function sendForfeitAction() {
 	webSocket.send(JSON.stringify({ requestType: "action", action: "forfeit" }));
 }
 
+function sendRebuildAction(coord, withResource) {
+	var req = { requestType: "action", action: "rebuild", coordinate: coord };
+	if (withResource) {
+		req.with = withResource;
+	}
+	webSocket.send(JSON.stringify(req));
+}
+
 function sendBuildUnitAction(unit, tileCoord, withResource) {
 	var req = { requestType: "action", action: "buildUnit", unit: unit, tile: tileCoord };
 	if (withResource) {
@@ -966,6 +974,7 @@ function handleGetGameState(gameStateData) {
 	// Cursed Catan: the March of Industry
 	industryTrack = gameStateData.industryTrack || 0;
 	warData = gameStateData.war || null;
+	warOutcome = gameStateData.warOutcome || null;
 	lastHandData = gameStateData.hand || {};
 	longestTurnPlayerId = (gameStateData.longestTurnPlayer !== undefined) ? gameStateData.longestTurnPlayer : -1;
 	longestTurnSeconds = gameStateData.longestTurnSeconds || 0;
