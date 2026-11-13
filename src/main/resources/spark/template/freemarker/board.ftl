@@ -174,6 +174,9 @@
 		    		</li>
 		    		<!-- C&K Build Options (hidden by default, shown via JS) -->
 		    		<li class="list-group-item cursed-build-option hidden">
+				    	<input type="button" class="btn btn-default build-btn" id="rebuild-btn" value="Rebuild / Repair" title="Rebuild a ruined building or repair a damaged one. Settlement: 1 brick + 1 wood. City: 1 brick + 1 ore or 1 concrete. Factory: 2 brick or 2 concrete. Capitol: 2 brick + 1 ore + 1 concrete.">
+		    		</li>
+		    		<li class="list-group-item cursed-build-option hidden">
 				    	<input type="button" class="btn btn-default build-btn" id="factory-build-btn" value="Build Factory" title="Upgrade one of your settlements. 1 VP. Up to 2.">
 				    	<br>
 				    	<span>1</span>
