@@ -2485,6 +2485,25 @@ function updateCursedCardsUI(handData) {
 		playable.append(spy);
 	}
 
+	// The Great War deck
+	for (var w = 0; w < WAR_CARDS.length; w++) {
+		var wc = WAR_CARDS[w];
+		var have = cards[wc.name] || 0;
+		if (have < 1) {
+			continue;
+		}
+		var chip = $("<span class='cursed-card-chip war-card-chip'></span>").attr("title", wc.help);
+		chip.append($("<strong></strong>").text(wc.name));
+		chip.append(document.createTextNode(" \u00d7" + have));
+		if (wc.id === "secretNuclearTests") {
+			chip.append(document.createTextNode(" (counts as a Test Site)"));
+		} else {
+			chip.append($("<button type='button' class='btn btn-danger btn-xs war-card-play'></button>")
+				.attr("data-card", wc.id).text("Play"));
+		}
+		playable.append(chip);
+	}
+
 	var held = $("#cursed-held-cards").empty();
 	for (var i = 0; i < CURSED_HELD_CARDS.length; i++) {
 		var n = cards[CURSED_HELD_CARDS[i]] || 0;
@@ -3214,6 +3233,7 @@ function setWarMode(mode) {
 function clearWarMode() {
 	warMode = null;
 	warPick = null;
+	warCard = null;
 	$(".war-mode-btn").removeClass("active");
 	$("#war-hint").empty();
 	$("#war-form").empty();
@@ -3252,6 +3272,8 @@ function warTileUsable(tile) {
 			return canMoveTotal(c, true) > 0;
 		case "fight":
 			return !warPick && !!myUnitsOn(c);
+		case "card":
+			return !!warCard && warCardTileOk(tile);
 		default:
 			return false;
 	}
@@ -3289,6 +3311,8 @@ function warTileClicked(tile) {
 		warPick = c;
 		renderWarForm();
 		markWarTiles();
+	} else if (warMode === "card") {
+		warCardTileClicked(tile);
 	}
 }
 
@@ -3440,4 +3464,219 @@ $("#rebuild-btn").click(function () {
 	} else {
 		enterRebuildMode();
 	}
+});
+
+
+//////////////////////////////////////////
+// Cursed Catan: the Great War deck
+//////////////////////////////////////////
+
+var WAR_CARDS = [
+	{ id: "mercenaries", name: "Mercenaries", help: "Place 1 tank or 1 aircraft on any tile", tiles: "land" },
+	{ id: "marines", name: "Marines", help: "Place 2 infantry on a coastal tile", tiles: "coastal" },
+	{ id: "copium", name: "Copium", help: "Your faction's Morale +2", tiles: null },
+	{ id: "desertion", name: "Desertion", help: "Remove 1 enemy infantry or artillery", tiles: "enemy-ground" },
+	{ id: "industrialSabotage", name: "Industrial Sabotage", help: "Steal 2 cards from a player of an enemy faction", tiles: null },
+	{ id: "redacted", name: "[REDACTED]", help: "Add 2 Devastation to any tile", tiles: "devastatable" },
+	{ id: "propaganda", name: "Propaganda", help: "An enemy faction's Morale -1", tiles: null },
+	{ id: "firebombs", name: "Firebombs", help: "Add 1 Devastation to any tile", tiles: "devastatable" },
+	{ id: "tankBuster", name: "Tank Buster", help: "Remove 1 enemy tank", tiles: "enemy-tank" },
+	{ id: "ackAckGuns", name: "Ack-Ack Guns", help: "Remove 1 enemy aircraft", tiles: "enemy-aircraft" },
+	{ id: "reforestation", name: "Reforestation", help: "Remove 1 Devastation from any tile", tiles: "devastated" },
+	{ id: "science", name: "Science!", help: "Gain 2 Research Points", tiles: null },
+	{ id: "secretNuclearTests", name: "Secret Nuclear Tests", help: "Counts as a Test Site while you hold it", tiles: null }
+];
+
+var warCard = null;   // the card being played, while a tile is chosen
+
+function warCardById(id) {
+	for (var i = 0; i < WAR_CARDS.length; i++) {
+		if (WAR_CARDS[i].id === id) {
+			return WAR_CARDS[i];
+		}
+	}
+	return null;
+}
+
+function sendPlayWarCardAction(params) {
+	params.requestType = "action";
+	params.action = "playWarCard";
+	webSocket.send(JSON.stringify(params));
+}
+
+/* Names of the other factions in the war. */
+function enemyFactions() {
+	var list = [];
+	for (var i = 0; i < warData.factions.length; i++) {
+		if (warData.factions[i].name !== warData.myFaction) {
+			list.push(warData.factions[i]);
+		}
+	}
+	return list;
+}
+
+/* Which enemy factions have this kind of unit on the tile. */
+function enemiesWith(coord, types) {
+	var found = [];
+	for (var i = 0; i < warData.units.length; i++) {
+		var u = warData.units[i];
+		if (u.faction === warData.myFaction || !sameCoord(u, coord)) {
+			continue;
+		}
+		for (var t = 0; t < types.length; t++) {
+			if (u.units[types[t]] > 0 && found.indexOf(u.faction) < 0) {
+				found.push(u.faction);
+			}
+		}
+	}
+	return found;
+}
+
+function isCoastalTile(tile) {
+	for (var i = 0; i < board.tiles.length; i++) {
+		if (board.tiles[i].tileType === TILE_TYPE.SEA && tilesAdjacent(board.tiles[i].coordinates, tile.coordinates)) {
+			return true;
+		}
+	}
+	return false;
+}
+
+function hasDevastation(coord) {
+	for (var i = 0; i < (warData.devastation || []).length; i++) {
+		if (sameCoord(warData.devastation[i], coord)) {
+			return true;
+		}
+	}
+	return false;
+}
+
+/* Whether a tile can be the target of the war card being played. */
+function warCardTileOk(tile) {
+	var c = tile.coordinates;
+	switch (warCard.tiles) {
+		case "land":
+			return true;
+		case "coastal":
+			return isCoastalTile(tile);
+		case "devastatable":
+			return tile.tileType !== TILE_TYPE.DESERT && tile.tileType !== TILE_TYPE.WASTELAND;
+		case "devastated":
+			return hasDevastation(c);
+		case "enemy-ground":
+			return enemiesWith(c, ["infantry", "artillery"]).length > 0;
+		case "enemy-tank":
+			return enemiesWith(c, ["tank"]).length > 0;
+		case "enemy-aircraft":
+			return enemiesWith(c, ["aircraft"]).length > 0;
+		default:
+			return false;
+	}
+}
+
+function startWarCard(id) {
+	var card = warCardById(id);
+	if (!card || !warData) {
+		return;
+	}
+	if (card.id === "copium" || card.id === "science") {
+		if (window.confirm(card.name + ": " + card.help + ". Play it?")) {
+			sendPlayWarCardAction({ card: card.id });
+		}
+		return;
+	}
+	if (card.id === "propaganda") {
+		var enemy = chooseEnemyFaction("Propaganda: which faction's Morale goes down?");
+		if (enemy !== null) {
+			sendPlayWarCardAction(enemy ? { card: card.id, enemy: enemy } : { card: card.id });
+		}
+		return;
+	}
+	if (card.id === "industrialSabotage") {
+		var target = chooseEnemyPlayer();
+		if (target !== null) {
+			sendPlayWarCardAction({ card: card.id, target: target });
+		}
+		return;
+	}
+	// the rest need a tile
+	clearWarMode();
+	warMode = "card";
+	warCard = card;
+	$("#war-hint").text(card.name + ": " + card.help + ". Click a highlighted tile.");
+	markWarTiles();
+}
+
+/*
+ * Which enemy faction? Returns the faction name, "" when only one is possible
+ * (the server picks it), or null if cancelled.
+ */
+function chooseEnemyFaction(question) {
+	var enemies = enemyFactions();
+	if (enemies.length === 1) {
+		return window.confirm(question.replace("which faction's", enemies[0].name + "'s").replace("?", ".") + " Play it?") ? "" : null;
+	}
+	var names = enemies.map(function (f) { return f.name; });
+	var answer = window.prompt(question + " (" + names.join(" or ") + ")", names[0]);
+	return answer && names.indexOf(answer) >= 0 ? answer : null;
+}
+
+/* Who to steal from: returns a player id, or null if cancelled. */
+function chooseEnemyPlayer() {
+	var candidates = [];
+	enemyFactions().forEach(function (f) {
+		f.players.forEach(function (id) {
+			if (playersById[id]) {
+				candidates.push(playersById[id]);
+			}
+		});
+	});
+	if (candidates.length === 0) {
+		return null;
+	}
+	if (candidates.length === 1) {
+		return window.confirm("Steal 2 cards from " + candidates[0].name + "?") ? candidates[0].id : null;
+	}
+	var names = candidates.map(function (p) { return p.name; });
+	var answer = window.prompt("Steal 2 cards from whom? (" + names.join(" or ") + ")", names[0]);
+	for (var i = 0; i < candidates.length; i++) {
+		if (candidates[i].name === answer) {
+			return candidates[i].id;
+		}
+	}
+	return null;
+}
+
+/* The chosen tile of the card being played: ask for what the card still needs. */
+function warCardTileClicked(tile) {
+	var c = tile.coordinates;
+	var params = { card: warCard.id, tile: c };
+	if (warCard.id === "mercenaries") {
+		params.unit = window.confirm("Place a tank? OK = tank, Cancel = aircraft.") ? "tank" : "aircraft";
+	} else if (warCard.id === "desertion") {
+		params.unit = window.confirm("Remove an infantry? OK = infantry, Cancel = artillery.") ? "infantry" : "artillery";
+		var who = enemiesWith(c, [params.unit]);
+		if (who.length > 1) {
+			var answer = window.prompt("Which faction? (" + who.join(" or ") + ")", who[0]);
+			if (!answer || who.indexOf(answer) < 0) {
+				return;
+			}
+			params.enemy = answer;
+		}
+	} else if (warCard.id === "tankBuster" || warCard.id === "ackAckGuns") {
+		var types = warCard.id === "tankBuster" ? ["tank"] : ["aircraft"];
+		var owners = enemiesWith(c, types);
+		if (owners.length > 1) {
+			var pick = window.prompt("Which faction? (" + owners.join(" or ") + ")", owners[0]);
+			if (!pick || owners.indexOf(pick) < 0) {
+				return;
+			}
+			params.enemy = pick;
+		}
+	}
+	sendPlayWarCardAction(params);
+	clearWarMode();
+}
+
+$(document).on("click", ".war-card-play", function () {
+	startWarCard($(this).attr("data-card"));
 });
