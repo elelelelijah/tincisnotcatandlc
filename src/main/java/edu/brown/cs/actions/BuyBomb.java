@@ -3,6 +3,7 @@ package edu.brown.cs.actions;
 import java.util.HashMap;
 import java.util.Map;
 
+import edu.brown.cs.catan.DevelopmentCard;
 import edu.brown.cs.catan.Player;
 import edu.brown.cs.catan.Referee;
 import edu.brown.cs.catan.Referee.GameStatus;
@@ -50,7 +51,9 @@ public class BuyBomb implements Action {
     if (!_ref.hasTech(_player.getID(), Tech.UNLOCK_ATOMIC_BOMBS)) {
       return fail("Your faction has not researched Atomic Bombs yet.");
     }
-    if (_player.numTestSites() < 1) {
+    boolean secretTests = _player.getDevCards().get(
+        DevelopmentCard.SECRET_NUCLEAR_TESTS) > 0;
+    if (_player.numTestSites() < 1 && !secretTests) {
       return fail("You need a Test Site to buy an Atomic Bomb.");
     }
     for (Map.Entry<Resource, Double> price : Settings.ATOMIC_BOMB_COST
