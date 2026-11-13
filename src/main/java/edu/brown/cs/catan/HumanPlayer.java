@@ -406,6 +406,15 @@ public class HumanPlayer implements Player {
   }
 
   @Override
+  public void clearWarCards() {
+    for (DevelopmentCard card : DevelopmentCard.values()) {
+      if (card.isWarCard()) {
+        devCards.put(card, 0);
+      }
+    }
+  }
+
+  @Override
   public void clearWarPieces() {
     numBombs = 0;
     numTestSites = 0;

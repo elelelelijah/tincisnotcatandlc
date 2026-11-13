@@ -184,6 +184,12 @@ public interface Player {
   }
 
   /**
+   * The war is over: the Great War cards in hand are taken away.
+   */
+  default void clearWarCards() {
+  }
+
+  /**
    * The war is over: Atomic Bombs and Test Sites are taken away.
    */
   default void clearWarPieces() {

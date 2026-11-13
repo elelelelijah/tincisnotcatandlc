@@ -35,7 +35,20 @@ public enum DevelopmentCard {
       "Right Leg of the Forbidden One", "the Right Leg of the Forbidden One",
       0), EXODIA_LEFT_LEG("Left Leg of the Forbidden One",
       "the Left Leg of the Forbidden One", 0), EXODIA_HEAD(
-      "Exodia the Forbidden One", "Exodia the Forbidden One", 0);
+      "Exodia the Forbidden One", "Exodia the Forbidden One", 0),
+
+  // ---- The Great War deck (45 cards, bought during the war)
+  MERCENARIES("Mercenaries", "Mercenaries", "mercenaries"), MARINES("Marines",
+      "Marines", "marines"), COPIUM("Copium", "Copium", "copium"), DESERTION(
+      "Desertion", "Desertion", "desertion"), INDUSTRIAL_SABOTAGE(
+      "Industrial Sabotage", "Industrial Sabotage", "industrialSabotage"), REDACTED(
+      "[REDACTED]", "[REDACTED]", "redacted"), PROPAGANDA("Propaganda",
+      "Propaganda", "propaganda"), FIREBOMBS("Firebombs", "Firebombs",
+      "firebombs"), TANK_BUSTER("Tank Buster", "Tank Buster", "tankBuster"), ACK_ACK_GUNS(
+      "Ack-Ack Guns", "Ack-Ack Guns", "ackAckGuns"), REFORESTATION(
+      "Reforestation", "Reforestation", "reforestation"), SCIENCE("Science!",
+      "Science!", "science"), SECRET_NUCLEAR_TESTS("Secret Nuclear Tests",
+      "Secret Nuclear Tests", "secretNuclearTests");
 
   /** The five cards that together win the game. */
   public static final List<DevelopmentCard> EXODIA_PIECES = Collections
@@ -46,12 +59,14 @@ public enum DevelopmentCard {
   private final String description;
   private final boolean cursedOnly;
   private final int socialCredit;
+  private final String warId;
 
   private DevelopmentCard(String name, String description) {
     this.name = name;
     this.description = description;
     this.cursedOnly = false;
     this.socialCredit = 0;
+    this.warId = null;
   }
 
   private DevelopmentCard(String name, String description, int socialCredit) {
@@ -59,6 +74,44 @@ public enum DevelopmentCard {
     this.description = description;
     this.cursedOnly = true;
     this.socialCredit = socialCredit;
+    this.warId = null;
+  }
+
+  private DevelopmentCard(String name, String description, String warId) {
+    this.name = name;
+    this.description = description;
+    this.cursedOnly = true;
+    this.socialCredit = 0;
+    this.warId = warId;
+  }
+
+  /**
+   * Whether this card belongs to the Great War deck.
+   */
+  public boolean isWarCard() {
+    return warId != null;
+  }
+
+  /**
+   * The name the client uses for a Great War card (null for other cards).
+   */
+  public String getWarId() {
+    return warId;
+  }
+
+  /**
+   * Turns a name sent by the client into a Great War card.
+   *
+   * @throws IllegalArgumentException
+   *           If there is no such card.
+   */
+  public static DevelopmentCard fromWarId(String id) {
+    for (DevelopmentCard c : values()) {
+      if (c.warId != null && c.warId.equals(id)) {
+        return c;
+      }
+    }
+    throw new IllegalArgumentException("Unknown war card: " + id);
   }
 
   /**

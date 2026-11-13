@@ -73,7 +73,9 @@ public class MasterReferee implements Referee {
   private String _warOutcome = null;
   private String _warEndMessage = null;
   private final Bank _bank;
-  private final List<DevelopmentCard> _devCardDeck;
+  private List<DevelopmentCard> _devCardDeck;
+  // The development deck is put aside while the Great War deck is in use
+  private List<DevelopmentCard> _standardDeck = null;
   private final GameSettings _gameSettings;
   private Player _largestArmy = null;
   private Player _longestRoad = null;
@@ -500,6 +502,28 @@ public class MasterReferee implements Referee {
     return toReturn;
   }
 
+  /**
+   * The Great War deck, 45 cards.
+   */
+  private List<DevelopmentCard> initializeWarDeck() {
+    List<DevelopmentCard> deck = new ArrayList<>();
+    addCards(deck, DevelopmentCard.MERCENARIES, 3);
+    addCards(deck, DevelopmentCard.MARINES, 3);
+    addCards(deck, DevelopmentCard.COPIUM, 4);
+    addCards(deck, DevelopmentCard.DESERTION, 5);
+    addCards(deck, DevelopmentCard.INDUSTRIAL_SABOTAGE, 3);
+    addCards(deck, DevelopmentCard.REDACTED, 2);
+    addCards(deck, DevelopmentCard.PROPAGANDA, 6);
+    addCards(deck, DevelopmentCard.FIREBOMBS, 4);
+    addCards(deck, DevelopmentCard.TANK_BUSTER, 3);
+    addCards(deck, DevelopmentCard.ACK_ACK_GUNS, 3);
+    addCards(deck, DevelopmentCard.REFORESTATION, 4);
+    addCards(deck, DevelopmentCard.SCIENCE, 3);
+    addCards(deck, DevelopmentCard.SECRET_NUCLEAR_TESTS, 2);
+    Collections.shuffle(deck, _random);
+    return deck;
+  }
+
   private static void addCards(List<DevelopmentCard> deck,
       DevelopmentCard card, int count) {
     for (int i = 0; i < count; i++) {
@@ -584,6 +608,9 @@ public class MasterReferee implements Referee {
     }
     // 6. No robber in the war
     _board.removeRobber();
+    // 7. The Great War deck replaces the development deck (cards in hand stay)
+    _standardDeck = _devCardDeck;
+    _devCardDeck = initializeWarDeck();
     // 8. Forces: 1 infantry per city, 1 artillery per factory, both for a
     // capitol; a player with no city or capitol gets 1 infantry; and 1
     // infantry per Knight played
@@ -803,6 +830,26 @@ public class MasterReferee implements Referee {
     return what.toString();
   }
 
+  @Override
+  public boolean devastate(HexCoordinate coord, int points) {
+    if (_war == null) {
+      throw new IllegalStateException("There is no war.");
+    }
+    Tile t = _board.getTile(coord);
+    if (t == null || !canBeDevastated(t)) {
+      throw new IllegalArgumentException(
+          "Sea, desert and wasteland cannot be devastated.");
+    }
+    for (int i = 0; i < points; i++) {
+      if (_war.addDevastation(coord)) {
+        t.setType(TileType.WASTELAND);
+        t.setRollNumber(0);
+        return true;
+      }
+    }
+    return false;
+  }
+
   // ----------------------------------------------------------- ending the war
 
   @Override
@@ -896,6 +943,14 @@ public class MasterReferee implements Referee {
           b.setOccupier(null);
         }
       }
+    }
+    // The standard development deck comes back and the war cards go
+    if (_standardDeck != null) {
+      _devCardDeck = _standardDeck;
+      _standardDeck = null;
+    }
+    for (Player p : _players.values()) {
+      p.clearWarCards();
     }
     for (Player p : _players.values()) {
       if (_war.getSanctioned() != null

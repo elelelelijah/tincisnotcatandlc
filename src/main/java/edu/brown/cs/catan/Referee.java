@@ -308,4 +308,14 @@ public interface Referee {
   default String getWarOutcome() {
     return null;
   }
+
+  /**
+   * Adds Devastation to a tile (Great War cards). At 3 points it becomes
+   * wasteland.
+   *
+   * @return True if the tile became wasteland.
+   */
+  default boolean devastate(HexCoordinate tile, int points) {
+    throw new UnsupportedOperationException("There is no war.");
+  }
 }
