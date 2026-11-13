@@ -99,6 +99,10 @@ public class EndTurn implements Action {
         toRet.put(p.getID(), toAdd);
       }
     }
+    String warEnd = _ref.takeWarEndMessage();
+    if (warEnd != null) {
+      industryNote += " " + warEnd;
+    }
     if (warStarted) {
       StringBuilder factions = new StringBuilder();
       for (Player p : _ref.getPlayers()) {

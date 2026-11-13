@@ -101,6 +101,19 @@ public class RollDice implements FollowUpAction {
         }
       }
       Collection<Tile> tiles = _ref.getBoard().getTiles();
+      // Great War: a devastated tile produces nothing, and rolling its number
+      // takes a point away (it still produces nothing this roll)
+      _devastatedThisRoll.clear();
+      if (_ref.isWarActive()) {
+        for (Tile t : tiles) {
+          if (_ref.getWarState().getDevastation(t.getCoordinate()) > 0) {
+            _devastatedThisRoll.add(t.getCoordinate());
+            if (t.getRollNumber() == diceRoll) {
+              _ref.getWarState().removeDevastation(t.getCoordinate());
+            }
+          }
+        }
+      }
       // Iterate through tiles on the board
       for (Tile t : tiles) {
         // Tiles with no fixed resource (e.g. Cursed Catan gold) do not pay
@@ -165,7 +178,7 @@ public class RollDice implements FollowUpAction {
       Map<Integer, Integer> warFactoryGold = new HashMap<>();
       for (Map.Entry<Integer, List<Resource>> e : factoryUnits.entrySet()) {
         int owner = e.getKey();
-        if (_ref.isWarActive()) {
+        if (_ref.isGreatWarTriggered()) {
           warFactoryGold.put(owner, e.getValue().size());
         } else if (coalBefore.get(owner) >= 1.0) {
           deferredFactories.put(owner, e.getValue());
@@ -429,6 +442,16 @@ public class RollDice implements FollowUpAction {
           }
         }
       }
+      // Great War: Devastation and Morale
+      if (_ref.isWarActive()) {
+        String warNote = _ref.resolveWarSeven();
+        for (Map.Entry<Integer, ActionResponse> e : new ArrayList<>(toRet
+            .entrySet())) {
+          ActionResponse old = e.getValue();
+          toRet.put(e.getKey(), new ActionResponse(old.getSuccess(),
+              old.getMessage() + " " + warNote, old.getData()));
+        }
+      }
       // Follow up MoveRobber action (there is no robber in the Great War):
       if (!_ref.isWarActive()) {
         Collection<FollowUpAction> followUps = new ArrayList<>();
@@ -621,7 +644,12 @@ public class RollDice implements FollowUpAction {
 
   // The robber stops a tile paying out, except to players who have a fortress
   // on it.
+  private final java.util.Set<edu.brown.cs.board.HexCoordinate> _devastatedThisRoll = new java.util.HashSet<>();
+
   private boolean blockedByRobber(Tile tile, int playerID) {
+    if (_devastatedThisRoll.contains(tile.getCoordinate())) {
+      return true;
+    }
     if (tile.hasRobber() && !tile.hasFortress(playerID)) {
       return true;
     }
