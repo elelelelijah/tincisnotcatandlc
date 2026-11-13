@@ -28,6 +28,7 @@ import edu.brown.cs.actions.BuyBomb;
 import edu.brown.cs.actions.Forfeit;
 import edu.brown.cs.actions.LaunchBomb;
 import edu.brown.cs.actions.Research;
+import edu.brown.cs.actions.Rebuild;
 import edu.brown.cs.actions.PlayBorderRaid;
 import edu.brown.cs.actions.PlayKnight;
 import edu.brown.cs.actions.PlayMonopoly;
@@ -139,6 +140,10 @@ public class ActionFactory {
           return new Entrench(_referee, playerID, actionJSON);
         case DeclareCombat.ID:
           return new DeclareCombat(_referee, playerID, actionJSON);
+        case Rebuild.ID:
+          return new Rebuild(_referee, playerID,
+              toIntersectionCoordinate(actionJSON.get("coordinate")
+                  .getAsJsonObject()), actionJSON);
         case Research.ID:
           return new Research(_referee, playerID, actionJSON);
         case BuyBomb.ID:

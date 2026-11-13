@@ -93,6 +93,7 @@ public class CatanConverter {
     private Integer industryTrack;
     private Boolean greatWarTriggered;
     private WarRaw war;
+    private String warOutcome;
     // C&K fields (null when not in C&K mode)
     private BarbarianTrackRaw barbarianTrack;
     private Integer merchantOwner;
@@ -152,6 +153,7 @@ public class CatanConverter {
         if (ref.isWarActive()) {
           this.war = new WarRaw(ref, playerID);
         }
+        this.warOutcome = ref.getWarOutcome();
       }
       // C&K state
       if (ref.getGameSettings().isCitiesAndKnights && ref instanceof MasterReferee) {
@@ -470,6 +472,14 @@ knight = knightPiece != null
     private Integer nuclearWinterRollNeeded;
     private String sanctioned;
     private List<TechRaw> techTree = new ArrayList<>();
+    private List<DevastationRaw> devastation = new ArrayList<>();
+
+    private static class DevastationRaw {
+      private int x;
+      private int y;
+      private int z;
+      private int points;
+    }
 
     private static class TechRaw {
       private String id;
@@ -553,6 +563,14 @@ knight = knightPiece != null
         for (Map.Entry<UnitType, Integer> e : owed.entrySet()) {
           toDeploy.put(e.getKey().toString(), e.getValue());
         }
+      }
+      for (Map.Entry<HexCoordinate, Integer> d : war.getDevastation().entrySet()) {
+        DevastationRaw dr = new DevastationRaw();
+        dr.x = d.getKey().getX();
+        dr.y = d.getKey().getY();
+        dr.z = d.getKey().getZ();
+        dr.points = d.getValue();
+        devastation.add(dr);
       }
       nuclearWinter = war.getNuclearWinter();
       nuclearWinterRollNeeded = war.rollNeededToAdvance();
