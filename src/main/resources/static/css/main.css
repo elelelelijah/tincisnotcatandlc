@@ -1038,3 +1038,29 @@ body {
 #war-actions .war-field input[type=number] {
 	width: 56px;
 }
+
+
+/* Cursed Catan: Devastation and the war's outcome (placeholder styling) */
+.tile-devastation {
+	position: absolute;
+	top: 8%;
+	left: 0;
+	right: 0;
+	text-align: center;
+	pointer-events: none;
+	z-index: 5;
+}
+
+.tile-devastation span {
+	display: inline-block;
+	background: #5a2a2a;
+	color: #fff;
+	border-radius: 8px;
+	font-size: 10px;
+	padding: 0 5px;
+}
+
+#war-outcome {
+	max-width: 215px;
+	font-weight: bold;
+}
