@@ -68,6 +68,7 @@ public class MasterReferee implements Referee {
   private final Set<Integer> _eliminated = new HashSet<>();
   private static final int WAR_WIN_POINTS = 5;
   private final Set<Integer> _sanctionedPlayers = new HashSet<>();
+  private final Set<Integer> _autoCasualties = new HashSet<>();
   private boolean _warEnded = false;
   private final Set<Integer> _warWinners = new HashSet<>();
   private String _warOutcome = null;
@@ -712,6 +713,20 @@ public class MasterReferee implements Referee {
   public boolean hasTech(int playerID, Tech tech) {
     return _war != null && _war.getFaction(playerID) != null
         && _war.hasTech(_war.getFaction(playerID), tech);
+  }
+
+  @Override
+  public boolean isAutoCasualties(int playerID) {
+    return _autoCasualties.contains(playerID);
+  }
+
+  @Override
+  public void setAutoCasualties(int playerID, boolean auto) {
+    if (auto) {
+      _autoCasualties.add(playerID);
+    } else {
+      _autoCasualties.remove(playerID);
+    }
   }
 
   @Override

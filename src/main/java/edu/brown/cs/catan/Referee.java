@@ -318,4 +318,15 @@ public interface Referee {
   default boolean devastate(HexCoordinate tile, int points) {
     throw new UnsupportedOperationException("There is no war.");
   }
+
+  /**
+   * Whether the player lets the game pick their casualties (cheapest first)
+   * instead of asking them.
+   */
+  default boolean isAutoCasualties(int playerID) {
+    return false;
+  }
+
+  default void setAutoCasualties(int playerID, boolean auto) {
+  }
 }

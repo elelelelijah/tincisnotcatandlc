@@ -171,7 +171,12 @@ public final class WarCombat {
         list.add(t);
       }
     }
-    // Fortresses first, then the weakest
+    sortTargets(list);
+    return list;
+  }
+
+  /** Fortresses first, then the weakest. */
+  private static void sortTargets(List<Target> list) {
     Collections.sort(list, new Comparator<Target>() {
       @Override
       public int compare(Target a, Target b) {
@@ -181,194 +186,517 @@ public final class WarCombat {
         return Integer.compare(a.hp(), b.hp());
       }
     });
-    return list;
   }
 
   /**
-   * Fights.
+   * Who picks the casualties of a faction: the id of a player, or null when
+   * they are picked automatically.
+   */
+  public interface Chooser {
+    Integer chooserFor(Faction faction);
+  }
+
+  /** A faction's casualties have to be chosen by somebody. */
+  public static final class Request {
+    private final int _chooser;
+    private final Faction _victim;
+    private final int _required;
+    private final Map<UnitType, Integer> _options;
+    private final UnitType[] _autoOrder;
+    private final String _reason;
+    private Map<UnitType, Integer> _chosen = null;
+    private boolean _registered = false;
+
+    private Request(int chooser, Faction victim, int required,
+        Map<UnitType, Integer> options, UnitType[] autoOrder, String reason) {
+      _chooser = chooser;
+      _victim = victim;
+      _required = required;
+      _options = options;
+      _autoOrder = autoOrder;
+      _reason = reason;
+    }
+
+    /** The player who has to choose. */
+    public int getChooser() {
+      return _chooser;
+    }
+
+    /** The faction that loses the units. */
+    public Faction getVictim() {
+      return _victim;
+    }
+
+    /** How many units have to be chosen. */
+    public int getRequired() {
+      return _required;
+    }
+
+    /** The ground units the losses can be taken from. */
+    public Map<UnitType, Integer> getOptions() {
+      return Collections.unmodifiableMap(_options);
+    }
+
+    public String getReason() {
+      return _reason;
+    }
+
+    /** Whether a follow-up has already been made for this choice. */
+    public boolean isRegistered() {
+      return _registered;
+    }
+
+    public void markRegistered() {
+      _registered = true;
+    }
+  }
+
+  /** What a fight has come to: finished, or waiting for choices. */
+  public static final class Outcome {
+    private final boolean _finished;
+    private final String _log;
+    private final List<Request> _pending;
+
+    private Outcome(boolean finished, String log, List<Request> pending) {
+      _finished = finished;
+      _log = log;
+      _pending = pending;
+    }
+
+    public boolean isFinished() {
+      return _finished;
+    }
+
+    /** Everything that has happened so far. */
+    public String getLog() {
+      return _log;
+    }
+
+    /** The choices that are still needed. */
+    public List<Request> getPending() {
+      return _pending;
+    }
+  }
+
+  /**
+   * Starts a fight that stops whenever somebody has a real choice of
+   * casualties (see {@link Fight#begin()}).
    *
-   * @param ref
-   *          The referee.
-   * @param attacker
-   *          The faction of the acting player.
-   * @param defender
-   *          The enemy faction fought here.
-   * @param tile
-   *          Where the fight is.
-   * @param toBuildings
-   *          How many units of each type attack buildings instead of troops.
-   * @param die
-   *          Supplies each D6 roll.
+   * @param chooser
+   *          Who picks each faction's casualties, or null for automatic.
+   * @throws IllegalArgumentException
+   *           If the fight is not allowed.
+   */
+  public static Fight start(Referee ref, Faction attacker, Faction defender,
+      Tile tile, Map<UnitType, Integer> toBuildings, IntSupplier die,
+      Chooser chooser) {
+    return new Fight(ref, attacker, defender, tile, toBuildings, die, chooser);
+  }
+
+  /**
+   * Fights with every casualty picked automatically.
+   *
    * @return A description of the fight.
    * @throws IllegalArgumentException
    *           If the fight is not allowed.
    */
   public static String fight(Referee ref, Faction attacker, Faction defender,
       Tile tile, Map<UnitType, Integer> toBuildings, IntSupplier die) {
-    WarState war = ref.getWarState();
-    HexCoordinate at = tile.getCoordinate();
-    if (defender == null || defender == attacker
-        || !war.getFactionList().contains(defender)) {
-      throw new IllegalArgumentException("Choose an enemy faction to fight.");
+    Fight f = start(ref, attacker, defender, tile, toBuildings, die, null);
+    Outcome o = f.begin();
+    while (!o.isFinished()) {
+      List<Request> pending = new ArrayList<>(o.getPending());
+      for (Request r : pending) {
+        o = f.answer(r, null);
+      }
     }
-    if (tile.getType() == TileType.SEA) {
-      throw new IllegalArgumentException("Fights happen on land tiles.");
+    return o.getLog();
+  }
+
+  private enum Phase {
+    NEW, AIR, GROUND, DONE
+  }
+
+  /**
+   * One fight. Aircraft roll first, then ground troops. When a side has to
+   * pick which of its ground units are lost, the fight waits for the answer.
+   */
+  public static final class Fight {
+    private final Referee _ref;
+    private final WarState _war;
+    private final Faction _attacker;
+    private final Faction _defender;
+    private final Tile _tile;
+    private final HexCoordinate _at;
+    private final IntSupplier _die;
+    private final Chooser _chooser;
+    private final Map<UnitType, Integer> _toBuildings;
+    private final StringBuilder _log = new StringBuilder();
+    private final List<Integer> _buildingDamage = new ArrayList<>();
+    private List<Target> _targets;
+    private int _assigned;
+    private Phase _phase = Phase.NEW;
+    private final List<Request> _pending = new ArrayList<>();
+    // losses already worked out for this step; applied when all is chosen
+    private final Map<UnitType, Integer> _killA = new EnumMap<>(UnitType.class);
+    private final Map<UnitType, Integer> _killD = new EnumMap<>(UnitType.class);
+    private final Map<Request, Boolean> _forAttackerStack = new java.util.IdentityHashMap<>();
+
+    private Fight(Referee ref, Faction attacker, Faction defender, Tile tile,
+        Map<UnitType, Integer> toBuildings, IntSupplier die, Chooser chooser) {
+      _ref = ref;
+      _war = ref.getWarState();
+      _attacker = attacker;
+      _defender = defender;
+      _tile = tile;
+      _at = tile.getCoordinate();
+      _die = die;
+      _chooser = chooser;
+      _toBuildings = toBuildings;
     }
-    if (war.hasFoughtThisTurn(at)) {
-      throw new IllegalArgumentException(
-          "There has already been a fight on that tile this turn.");
+
+    public Faction getAttacker() {
+      return _attacker;
     }
-    int fighters = 0;
-    for (UnitType t : UnitType.values()) {
-      fighters += war.getReadyToFight(at, attacker, t);
+
+    public Faction getDefender() {
+      return _defender;
     }
-    if (fighters == 0) {
-      throw new IllegalArgumentException(
-          "You have no units there that can fight (units built this turn cannot).");
+
+    public Tile getTile() {
+      return _tile;
     }
-    List<Target> targets = targets(ref, tile, defender);
-    if (!war.getEnemyFactionsOn(at, attacker).contains(defender)
-        && targets.isEmpty()) {
-      throw new IllegalArgumentException(
-          "There is nothing of that faction to fight on or next to that tile.");
+
+    /**
+     * Checks the fight is allowed and plays it up to the first choice.
+     *
+     * @throws IllegalArgumentException
+     *           If the fight is not allowed.
+     */
+    public Outcome begin() {
+      if (_phase != Phase.NEW) {
+        throw new IllegalStateException("This fight has already begun.");
+      }
+      validate();
+      _war.markFought(_at);
+      _log.append(String.format("%s fights %s.", _attacker, _defender));
+      return stepAir();
     }
-    Map<UnitType, Integer> assign = new EnumMap<>(UnitType.class);
-    int assigned = 0;
-    for (UnitType t : UnitType.values()) {
-      Integer n = toBuildings.get(t);
-      if (n != null && n > 0) {
-        if (n > war.getReadyToFight(at, attacker, t)) {
+
+    private void validate() {
+      if (_defender == null || _defender == _attacker
+          || !_war.getFactionList().contains(_defender)) {
+        throw new IllegalArgumentException("Choose an enemy faction to fight.");
+      }
+      if (_tile.getType() == TileType.SEA) {
+        throw new IllegalArgumentException("Fights happen on land tiles.");
+      }
+      if (_war.hasFoughtThisTurn(_at)) {
+        throw new IllegalArgumentException(
+            "There has already been a fight on that tile this turn.");
+      }
+      int fighters = 0;
+      for (UnitType t : UnitType.values()) {
+        fighters += _war.getReadyToFight(_at, _attacker, t);
+      }
+      if (fighters == 0) {
+        throw new IllegalArgumentException(
+            "You have no units there that can fight (units built this turn cannot).");
+      }
+      _targets = targets(_ref, _tile, _defender);
+      if (!_war.getEnemyFactionsOn(_at, _attacker).contains(_defender)
+          && _targets.isEmpty()) {
+        throw new IllegalArgumentException(
+            "There is nothing of that faction to fight on or next to that tile.");
+      }
+      _assign.clear();
+      _assigned = 0;
+      for (UnitType t : UnitType.values()) {
+        Integer n = _toBuildings.get(t);
+        if (n != null && n > 0) {
+          if (n > _war.getReadyToFight(_at, _attacker, t)) {
+            throw new IllegalArgumentException(String.format(
+                "You don't have %d %s able to fight there.", n, t));
+          }
+          _assign.put(t, n);
+          _assigned += n;
+        }
+      }
+      if (_assigned > 0 && _targets.isEmpty()) {
+        throw new IllegalArgumentException("There are no buildings to attack.");
+      }
+    }
+
+    private final Map<UnitType, Integer> _assign = new EnumMap<>(UnitType.class);
+
+    // ------------------------------------------------ step one: aircraft
+
+    private Outcome stepAir() {
+      WarState war = _war;
+      int airA = war.getReadyToFight(_at, _attacker, UnitType.AIRCRAFT);
+      int airD = war.getReadyToFight(_at, _defender, UnitType.AIRCRAFT);
+      int airToBuildings = Math.min(_assign.containsKey(UnitType.AIRCRAFT) ? _assign
+          .get(UnitType.AIRCRAFT) : 0, airA);
+      int airToTroops = airA - airToBuildings;
+      int diceA = dice(war, _attacker, UnitType.AIRCRAFT);
+      int diceD = dice(war, _defender, UnitType.AIRCRAFT);
+      for (int n = 0; n < airToBuildings * diceA; n++) {
+        if (hitsBuilding(_die.getAsInt())) {
+          _buildingDamage.add(1);
+        }
+      }
+      int airHitsA = 0;
+      for (int n = 0; n < airToTroops * diceA; n++) {
+        if (_die.getAsInt() >= NATURAL_HIT) {
+          airHitsA++;
+        }
+      }
+      int airHitsD = 0;
+      for (int n = 0; n < airD * diceD; n++) {
+        if (_die.getAsInt() >= NATURAL_HIT) {
+          airHitsD++;
+        }
+      }
+      if (airA + airD > 0) {
+        _log.append(String.format(
+            " Aircraft: %s scored %d on troops%s, %s scored %d.", _attacker,
+            airHitsA, airToBuildings > 0 ? " and " + _buildingDamage.size()
+                + " on buildings" : "", _defender, airHitsD));
+      }
+      // Both sides' casualties are worked out before anything is removed
+      int airKilledD = Math.min(airHitsA, airD);
+      int groundHitsFromAirA = war.hasTech(_attacker, Tech.AIRCRAFT_GROUND) ? airHitsA
+          - airKilledD : 0;
+      int airKilledA = Math.min(airHitsD, airA);
+      int groundHitsFromAirD = war.hasTech(_defender, Tech.AIRCRAFT_GROUND) ? airHitsD
+          - airKilledA : 0;
+      _killD.clear();
+      _killA.clear();
+      if (airKilledD > 0) {
+        _killD.put(UnitType.AIRCRAFT, airKilledD);
+      }
+      if (airKilledA > 0) {
+        _killA.put(UnitType.AIRCRAFT, airKilledA);
+      }
+      _pending.clear();
+      // Aircraft that hit troops pick them: their own side chooses
+      askOrAllocate(_defender, groundHitsFromAirA, _attacker, STRONGEST_FIRST,
+          _killD, "your aircraft hit enemy troops", false);
+      askOrAllocate(_attacker, groundHitsFromAirD, _defender, GROUND, _killA,
+          "your aircraft hit enemy troops", true);
+      _phase = Phase.AIR;
+      if (!_pending.isEmpty()) {
+        return waiting();
+      }
+      return afterAir();
+    }
+
+    private Outcome afterAir() {
+      applyKills(_war, _at, _defender, _killD);
+      applyKills(_war, _at, _attacker, _killA);
+      if (!_killD.isEmpty() || !_killA.isEmpty()) {
+        _log.append(String.format(" Lost in the air: %s %s, %s %s.", _attacker,
+            describe(_killA), _defender, describe(_killD)));
+      }
+      return stepGround();
+    }
+
+    // ------------------------------------------- step two: ground troops
+
+    private Outcome stepGround() {
+      WarState war = _war;
+      int penaltyOnD = war.isEntrenched(_at, _defender) ? 1 : 0;
+      int penaltyOnA = war.isEntrenched(_at, _attacker) ? 1 : 0;
+      int groundHitsA = 0;
+      for (UnitType t : GROUND) {
+        int ready = war.getReadyToFight(_at, _attacker, t);
+        int toTroops = ready - Math.min(ready, _assign.containsKey(t) ? _assign
+            .get(t) : 0);
+        for (int n = 0; n < toTroops * dice(war, _attacker, t); n++) {
+          if (hitsTroops(_die.getAsInt(), t, toHitBonus(war, _attacker, t),
+              penaltyOnD)) {
+            groundHitsA++;
+          }
+        }
+      }
+      int groundHitsD = 0;
+      for (UnitType t : GROUND) {
+        int ready = war.getReadyToFight(_at, _defender, t);
+        for (int n = 0; n < ready * dice(war, _defender, t); n++) {
+          if (hitsTroops(_die.getAsInt(), t, toHitBonus(war, _defender, t),
+              penaltyOnA)) {
+            groundHitsD++;
+          }
+        }
+      }
+      for (UnitType t : GROUND) {
+        int ready = war.getReadyToFight(_at, _attacker, t);
+        int toB = Math.min(ready, _assign.containsKey(t) ? _assign.get(t) : 0);
+        int bonus = buildingDamageBonus(war, _attacker, t);
+        for (int n = 0; n < toB * dice(war, _attacker, t); n++) {
+          if (hitsBuilding(_die.getAsInt())) {
+            _buildingDamage.add(1 + bonus);
+          }
+        }
+      }
+      _groundFight = groundHitsA + groundHitsD > 0
+          || war.getEnemyFactionsOn(_at, _attacker).contains(_defender);
+      _groundHitsA = groundHitsA;
+      _groundHitsD = groundHitsD;
+      _killA.clear();
+      _killD.clear();
+      _pending.clear();
+      // Each side picks which of its own ground troops are lost
+      askOrAllocate(_defender, groundHitsA, _defender, GROUND, _killD,
+          "ground hits", false);
+      askOrAllocate(_attacker, groundHitsD, _attacker, GROUND, _killA,
+          "ground hits", true);
+      _phase = Phase.GROUND;
+      if (!_pending.isEmpty()) {
+        return waiting();
+      }
+      return afterGround();
+    }
+
+    private boolean _groundFight;
+    private int _groundHitsA;
+    private int _groundHitsD;
+
+    private Outcome afterGround() {
+      applyKills(_war, _at, _defender, _killD);
+      applyKills(_war, _at, _attacker, _killA);
+      if (_groundFight) {
+        _log.append(String.format(
+            " Ground: %s scored %d hits and lost %s; %s scored %d hits and lost %s.",
+            _attacker, _groundHitsA, describe(_killA), _defender, _groundHitsD,
+            describe(_killD)));
+      }
+      if (!_buildingDamage.isEmpty()) {
+        _log.append(applyBuildingDamage(_ref, _tile, _attacker, _defender,
+            _buildingDamage, _die, _targets));
+      } else if (_assigned > 0) {
+        _log.append(" The attack on the buildings did no damage.");
+      }
+      _phase = Phase.DONE;
+      return new Outcome(true, _log.toString(), Collections.<Request> emptyList());
+    }
+
+    // ------------------------------------------------------------ choices
+
+    /**
+     * Works out the casualties of the victim's ground troops: they are picked
+     * automatically unless somebody has a real choice (the victim has several
+     * kinds of ground unit and the hits do not take them all), in which case
+     * a request is added.
+     */
+    private void askOrAllocate(Faction victim, int hits, Faction hitter,
+        UnitType[] autoOrder, Map<UnitType, Integer> losses, String reason,
+        boolean attackerStack) {
+      int total = 0;
+      int kinds = 0;
+      Map<UnitType, Integer> options = new EnumMap<>(UnitType.class);
+      Faction stackOwner = attackerStack ? _attacker : _defender;
+      Faction owner = reason.startsWith("ground") ? victim : victim;
+      for (UnitType t : GROUND) {
+        int have = _war.getUnits(_at, stackOwner, t)
+            - (losses.containsKey(t) ? losses.get(t) : 0);
+        if (have > 0) {
+          options.put(t, have);
+          total += have;
+          kinds++;
+        }
+      }
+      int required = Math.min(hits, total);
+      if (required <= 0) {
+        return;
+      }
+      // Ground hits are chosen by the victim; aircraft hits by the hitter
+      Faction chooserFaction = reason.startsWith("ground") ? stackOwner : hitter;
+      Integer chooser = _chooser == null ? null : _chooser.chooserFor(
+          chooserFaction);
+      if (chooser == null || required >= total || kinds <= 1) {
+        allocateGround(_war, _at, stackOwner, required, autoOrder, losses);
+        return;
+      }
+      Request r = new Request(chooser, stackOwner, required, options, autoOrder,
+          reason);
+      _forAttackerStack.put(r, attackerStack);
+      _pending.add(r);
+    }
+
+    private Outcome waiting() {
+      return new Outcome(false, _log.toString(), new ArrayList<>(_pending));
+    }
+
+    /**
+     * Gives the answer to a request. With no losses given (null) the casualties
+     * are picked automatically.
+     *
+     * @param losses
+     *          How many of each ground unit type are lost.
+     * @throws IllegalArgumentException
+     *           If the answer does not fit the request.
+     */
+    public Outcome answer(Request request, Map<UnitType, Integer> losses) {
+      if (!_pending.contains(request)) {
+        throw new IllegalStateException("That choice is not being waited for.");
+      }
+      Map<UnitType, Integer> chosen = new EnumMap<>(UnitType.class);
+      if (losses == null) {
+        allocateFrom(request, request._autoOrder, chosen);
+      } else {
+        int sum = 0;
+        for (Map.Entry<UnitType, Integer> e : losses.entrySet()) {
+          int n = e.getValue() == null ? 0 : e.getValue();
+          if (n < 0 || !WarState.isGround(e.getKey())) {
+            throw new IllegalArgumentException("Choose ground units to lose.");
+          }
+          if (n == 0) {
+            continue;
+          }
+          Integer have = request._options.get(e.getKey());
+          if (have == null || n > have) {
+            throw new IllegalArgumentException(String.format(
+                "There are not %d %s to lose.", n, e.getKey()));
+          }
+          chosen.put(e.getKey(), n);
+          sum += n;
+        }
+        if (sum != request._required) {
           throw new IllegalArgumentException(String.format(
-              "You don't have %d %s able to fight there.", n, t));
+              "Choose exactly %d unit%s to lose (you chose %d).",
+              request._required, request._required == 1 ? "" : "s", sum));
         }
-        assign.put(t, n);
-        assigned += n;
       }
-    }
-    if (assigned > 0 && targets.isEmpty()) {
-      throw new IllegalArgumentException("There are no buildings to attack.");
+      request._chosen = chosen;
+      _pending.remove(request);
+      Map<UnitType, Integer> target = _forAttackerStack.get(request) ? _killA
+          : _killD;
+      for (Map.Entry<UnitType, Integer> e : chosen.entrySet()) {
+        Integer old = target.get(e.getKey());
+        target.put(e.getKey(), (old == null ? 0 : old) + e.getValue());
+      }
+      if (!_pending.isEmpty()) {
+        return waiting();
+      }
+      return _phase == Phase.AIR ? afterAir() : afterGround();
     }
 
-    war.markFought(at);
-    StringBuilder log = new StringBuilder(String.format(
-        "%s fights %s.", attacker, defender));
-    List<Integer> buildingDamage = new ArrayList<>();
-
-    // ---------------------------------------------------- step one: aircraft
-    int airA = war.getReadyToFight(at, attacker, UnitType.AIRCRAFT);
-    int airD = war.getReadyToFight(at, defender, UnitType.AIRCRAFT);
-    int airToBuildings = Math.min(assign.containsKey(UnitType.AIRCRAFT) ? assign
-        .get(UnitType.AIRCRAFT) : 0, airA);
-    int airToTroops = airA - airToBuildings;
-    int diceA = dice(war, attacker, UnitType.AIRCRAFT);
-    int diceD = dice(war, defender, UnitType.AIRCRAFT);
-    for (int n = 0; n < airToBuildings * diceA; n++) {
-      if (hitsBuilding(die.getAsInt())) {
-        buildingDamage.add(1);
-      }
-    }
-    int airHitsA = 0;
-    for (int n = 0; n < airToTroops * diceA; n++) {
-      if (die.getAsInt() >= NATURAL_HIT) {
-        airHitsA++;
-      }
-    }
-    int airHitsD = 0;
-    for (int n = 0; n < airD * diceD; n++) {
-      if (die.getAsInt() >= NATURAL_HIT) {
-        airHitsD++;
-      }
-    }
-    if (airA + airD > 0) {
-      log.append(String.format(" Aircraft: %s scored %d on troops%s, %s scored %d.",
-          attacker, airHitsA, airToBuildings > 0 ? " and "
-              + countBuildingHits(buildingDamage) + " on buildings" : "",
-          defender, airHitsD));
-    }
-    // Both sides' casualties are worked out before anything is removed
-    int airKilledD = Math.min(airHitsA, airD);
-    int groundHitsFromAirA = war.hasTech(attacker, Tech.AIRCRAFT_GROUND) ? airHitsA
-        - airKilledD : 0;
-    int airKilledA = Math.min(airHitsD, airA);
-    int groundHitsFromAirD = war.hasTech(defender, Tech.AIRCRAFT_GROUND) ? airHitsD
-        - airKilledA : 0;
-    Map<UnitType, Integer> killD = new EnumMap<>(UnitType.class);
-    Map<UnitType, Integer> killA = new EnumMap<>(UnitType.class);
-    if (airKilledD > 0) {
-      killD.put(UnitType.AIRCRAFT, airKilledD);
-    }
-    if (airKilledA > 0) {
-      killA.put(UnitType.AIRCRAFT, airKilledA);
-    }
-    // Hits on ground troops: the attacker of aircraft picks the strongest;
-    // the victim of a ground hit loses the cheapest
-    allocateGround(war, at, defender, groundHitsFromAirA, STRONGEST_FIRST, killD);
-    allocateGround(war, at, attacker, groundHitsFromAirD, GROUND, killA);
-    applyKills(war, at, defender, killD);
-    applyKills(war, at, attacker, killA);
-    if (!killD.isEmpty() || !killA.isEmpty()) {
-      log.append(String.format(" Lost in the air: %s %s, %s %s.", attacker,
-          describe(killA), defender, describe(killD)));
-    }
-
-    // ------------------------------------------------- step two: ground troops
-    int penaltyOnD = war.isEntrenched(at, defender) ? 1 : 0;
-    int penaltyOnA = war.isEntrenched(at, attacker) ? 1 : 0;
-    int groundHitsA = 0;
-    for (UnitType t : GROUND) {
-      int ready = war.getReadyToFight(at, attacker, t);
-      int toTroops = ready - Math.min(ready, assign.containsKey(t) ? assign
-          .get(t) : 0);
-      for (int n = 0; n < toTroops * dice(war, attacker, t); n++) {
-        if (hitsTroops(die.getAsInt(), t, toHitBonus(war, attacker, t),
-            penaltyOnD)) {
-          groundHitsA++;
+    private void allocateFrom(Request r, UnitType[] order,
+        Map<UnitType, Integer> out) {
+      int left = r._required;
+      for (UnitType t : order) {
+        if (left <= 0) {
+          break;
+        }
+        Integer have = r._options.get(t);
+        int take = Math.min(left, have == null ? 0 : have);
+        if (take > 0) {
+          out.put(t, take);
+          left -= take;
         }
       }
     }
-    int groundHitsD = 0;
-    for (UnitType t : GROUND) {
-      int ready = war.getReadyToFight(at, defender, t);
-      for (int n = 0; n < ready * dice(war, defender, t); n++) {
-        if (hitsTroops(die.getAsInt(), t, toHitBonus(war, defender, t),
-            penaltyOnA)) {
-          groundHitsD++;
-        }
-      }
-    }
-    for (UnitType t : GROUND) {
-      int ready = war.getReadyToFight(at, attacker, t);
-      int toB = Math.min(ready, assign.containsKey(t) ? assign.get(t) : 0);
-      int bonus = buildingDamageBonus(war, attacker, t);
-      for (int n = 0; n < toB * dice(war, attacker, t); n++) {
-        if (hitsBuilding(die.getAsInt())) {
-          buildingDamage.add(1 + bonus);
-        }
-      }
-    }
-    boolean groundFight = groundHitsA + groundHitsD > 0
-        || war.getEnemyFactionsOn(at, attacker).contains(defender);
-    Map<UnitType, Integer> killD2 = new EnumMap<>(UnitType.class);
-    Map<UnitType, Integer> killA2 = new EnumMap<>(UnitType.class);
-    allocateGround(war, at, defender, groundHitsA, GROUND, killD2);
-    allocateGround(war, at, attacker, groundHitsD, GROUND, killA2);
-    applyKills(war, at, defender, killD2);
-    applyKills(war, at, attacker, killA2);
-    if (groundFight) {
-      log.append(String.format(
-          " Ground: %s scored %d hits and lost %s; %s scored %d hits and lost %s.",
-          attacker, groundHitsA, describe(killA2), defender, groundHitsD,
-          describe(killD2)));
-    }
-
-    // -------------------------------------------------------------- buildings
-    if (!buildingDamage.isEmpty()) {
-      log.append(applyBuildingDamage(ref, tile, attacker, defender,
-          buildingDamage, die, targets));
-    } else if (assigned > 0) {
-      log.append(" The attack on the buildings did no damage.");
-    }
-    return log.toString();
   }
 
   private static int countBuildingHits(List<Integer> damage) {

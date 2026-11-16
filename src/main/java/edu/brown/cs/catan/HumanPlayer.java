@@ -406,6 +406,19 @@ public class HumanPlayer implements Player {
   }
 
   @Override
+  public void giveAwayDevelopmentCard(DevelopmentCard card) {
+    int have = devCards.get(card);
+    if (have <= 0) {
+      throw new IllegalArgumentException(String.format(
+          "The player doesn't have the development card %s", card));
+    }
+    devCards.put(card, have - 1);
+    if (card == DevelopmentCard.POINT) {
+      numVictoryPoints--;
+    }
+  }
+
+  @Override
   public void clearWarCards() {
     for (DevelopmentCard card : DevelopmentCard.values()) {
       if (card.isWarCard()) {

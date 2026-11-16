@@ -184,6 +184,16 @@ public interface Player {
   }
 
   /**
+   * Hands a development card over to somebody else: it leaves this hand
+   * without being played (no Knight is counted, a Victory Point card takes its
+   * point with it).
+   */
+  default void giveAwayDevelopmentCard(DevelopmentCard card) {
+    throw new UnsupportedOperationException(
+        "Not supported for this player type.");
+  }
+
+  /**
    * The war is over: the Great War cards in hand are taken away.
    */
   default void clearWarCards() {
