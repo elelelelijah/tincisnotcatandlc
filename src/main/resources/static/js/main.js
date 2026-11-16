@@ -2699,6 +2699,7 @@ function drawWarPanel() {
 	}
 	panel.append(buildTechTree());
 	panel.append(buildBombSection());
+	panel.append(buildTeamSection());
 	$("#game-stats-container").append(panel);
 
 	// Normal construction has stopped
@@ -3679,4 +3680,173 @@ function warCardTileClicked(tile) {
 
 $(document).on("click", ".war-card-play", function () {
 	startWarCard($(this).attr("data-card"));
+});
+
+
+//////////////////////////////////////////
+// Cursed Catan: casualties and giving cards
+//////////////////////////////////////////
+
+var casualtyData = null;
+
+/*
+ * A fight is waiting for you to choose which of your units are lost. The
+ * dialog stays up (keeping what you typed) while the state refreshes.
+ */
+function enterCasualtyChoice(data) {
+	if (casualtyData && JSON.stringify(casualtyData) === JSON.stringify(data)
+		&& $("#casualty-modal").hasClass("in")) {
+		return;
+	}
+	casualtyData = data;
+	$("#casualty-message").text(data.message);
+	$("#casualty-required").text(data.required);
+	var rows = $("#casualty-rows").empty();
+	for (var type in data.options) {
+		if (data.options.hasOwnProperty(type)) {
+			var have = data.options[type];
+			var row = $("<div style='margin:3px 0;'></div>");
+			row.append($("<span style='display:inline-block; width:150px;'></span>").text(type + " (" + have + ")"));
+			row.append($("<input type='number' min='0' class='casualty-input' style='width:60px;'>")
+				.attr("data-unit", type).attr("max", Math.min(have, data.required)).val(0));
+			rows.append(row);
+		}
+	}
+	$(".auto-casualties-toggle").prop("checked", !!lastHandData.autoCasualties);
+	updateCasualtyTotal();
+	$("#casualty-modal").modal("show");
+}
+
+function casualtyLosses() {
+	var losses = {};
+	$("#casualty-rows .casualty-input").each(function () {
+		var n = parseInt($(this).val(), 10) || 0;
+		if (n > 0) {
+			losses[$(this).attr("data-unit")] = n;
+		}
+	});
+	return losses;
+}
+
+function updateCasualtyTotal() {
+	var total = 0;
+	var valid = true;
+	$("#casualty-rows .casualty-input").each(function () {
+		var n = parseInt($(this).val(), 10) || 0;
+		if (n < 0 || n > parseInt($(this).attr("max"), 10)) {
+			valid = false;
+		}
+		total += n;
+	});
+	$("#casualty-total").text(total);
+	$("#casualty-confirm-btn").prop("disabled", !(valid && casualtyData && total === casualtyData.required));
+}
+
+$(document).on("input change", ".casualty-input", updateCasualtyTotal);
+
+$(document).on("click", "#casualty-confirm-btn", function () {
+	sendChooseCasualtiesAction(casualtyLosses());
+	casualtyData = null;
+	$("#casualty-modal").modal("hide");
+});
+
+$(document).on("click", "#casualty-auto-btn", function () {
+	sendChooseCasualtiesAction(null);
+	casualtyData = null;
+	$("#casualty-modal").modal("hide");
+});
+
+$(document).on("change", ".auto-casualties-toggle", function () {
+	var on = $(this).is(":checked");
+	$(".auto-casualties-toggle").prop("checked", on);
+	sendSetAutoCasualtiesAction(on);
+});
+
+/* The players of my faction other than me who are still in the war. */
+function teammates() {
+	var mine = myFactionData();
+	var list = [];
+	for (var i = 0; i < mine.players.length; i++) {
+		var p = playersById[mine.players[i]];
+		if (p && p.id !== playerId && !p.eliminated) {
+			list.push(p);
+		}
+	}
+	return list;
+}
+
+function buildTeamSection() {
+	var section = $("<div id='team-section' style='margin-top:6px;'></div>");
+	if (teammates().length > 0) {
+		section.append($("<button type='button' class='btn btn-default btn-xs' id='gift-btn'></button>")
+			.text("Give cards to a teammate"));
+	}
+	section.append($("<div></div>").append($("<label style='font-weight:normal; font-size:12px;'></label>")
+		.append($("<input type='checkbox' class='auto-casualties-toggle'>").prop("checked", !!lastHandData.autoCasualties))
+		.append(document.createTextNode(" Pick my casualties for me"))));
+	return section;
+}
+
+var GIFT_RESOURCES = ["brick", "wood", "ore", "wheat", "sheep", "concrete", "uranium"];
+
+function openGiftDialog() {
+	var select = $("#gift-to").empty();
+	var mates = teammates();
+	for (var i = 0; i < mates.length; i++) {
+		select.append($("<option></option>").val(mates[i].id).text(mates[i].name));
+	}
+	var rows = $("#gift-rows").empty();
+	var res = lastHandData.resources || {};
+	for (var r = 0; r < GIFT_RESOURCES.length; r++) {
+		var have = Math.floor(res[GIFT_RESOURCES[r]] || 0);
+		if (have > 0) {
+			rows.append(giftRow("gift-resource", GIFT_RESOURCES[r], GIFT_RESOURCES[r] + " (" + have + ")", have));
+		}
+	}
+	var cards = lastHandData.devCards || {};
+	for (var name in cards) {
+		if (cards.hasOwnProperty(name) && cards[name] > 0) {
+			rows.append(giftRow("gift-card", name, name + " (" + cards[name] + ")", cards[name]));
+		}
+	}
+	updateGiftButton();
+	$("#gift-modal").modal("show");
+}
+
+function giftRow(cls, key, label, max) {
+	var row = $("<div style='margin:3px 0;'></div>");
+	row.append($("<span style='display:inline-block; width:200px;'></span>").text(label));
+	row.append($("<input type='number' min='0' style='width:60px;'>").addClass(cls).attr("data-key", key).attr("max", max).val(0));
+	return row;
+}
+
+function giftContents() {
+	var out = { resources: {}, devCards: {}, total: 0, valid: true };
+	$("#gift-rows input").each(function () {
+		var n = parseInt($(this).val(), 10) || 0;
+		if (n < 0 || n > parseInt($(this).attr("max"), 10)) {
+			out.valid = false;
+		}
+		if (n > 0) {
+			($(this).hasClass("gift-resource") ? out.resources : out.devCards)[$(this).attr("data-key")] = n;
+			out.total += n;
+		}
+	});
+	return out;
+}
+
+function updateGiftButton() {
+	var c = giftContents();
+	$("#gift-confirm-btn").prop("disabled", !(c.valid && c.total > 0 && $("#gift-to").val() !== null));
+}
+
+$(document).on("click", "#gift-btn", openGiftDialog);
+$(document).on("input change", "#gift-rows input, #gift-to", updateGiftButton);
+$(document).on("click", "#gift-confirm-btn", function () {
+	var c = giftContents();
+	if (!c.valid || c.total === 0) {
+		return;
+	}
+	sendGiveCardsAction(parseInt($("#gift-to").val(), 10), c.resources, c.devCards);
+	$("#gift-modal").modal("hide");
 });

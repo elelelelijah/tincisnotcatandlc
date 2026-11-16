@@ -295,6 +295,24 @@ function sendRebuildAction(coord, withResource) {
 	webSocket.send(JSON.stringify(req));
 }
 
+function sendChooseCasualtiesAction(losses) {
+	var req = { requestType: "action", action: "chooseCasualties" };
+	if (losses) {
+		req.losses = losses;
+	} else {
+		req.auto = true;
+	}
+	webSocket.send(JSON.stringify(req));
+}
+
+function sendSetAutoCasualtiesAction(enabled) {
+	webSocket.send(JSON.stringify({ requestType: "action", action: "setAutoCasualties", enabled: enabled }));
+}
+
+function sendGiveCardsAction(toId, resources, devCards) {
+	webSocket.send(JSON.stringify({ requestType: "action", action: "giveCards", to: toId, resources: resources, devCards: devCards }));
+}
+
 function sendBuildUnitAction(unit, tileCoord, withResource) {
 	var req = { requestType: "action", action: "buildUnit", unit: unit, tile: tileCoord };
 	if (withResource) {
@@ -891,6 +909,9 @@ function handleFollowUp(action) {
 			break;
 		case "goldResource":
 			enterGoldModal(action.actionData.count);
+			break;
+		case "chooseCasualties":
+			enterCasualtyChoice(action.actionData);
 			break;
 		case "deployUnits":
 			enterDeployMode(action.actionData.units, action.actionData.tiles);
