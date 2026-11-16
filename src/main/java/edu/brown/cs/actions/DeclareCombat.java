@@ -69,6 +69,34 @@ public class DeclareCombat implements Action {
     return toRet;
   }
 
+  /**
+   * Who picks a faction's casualties: the acting player for their own side,
+   * for the other side the first player of the faction who is still in the war.
+   * A player who lets the game pick (or nobody left) means automatic.
+   */
+  private WarCombat.Chooser chooser(final Faction attacker) {
+    return new WarCombat.Chooser() {
+      @Override
+      public Integer chooserFor(Faction faction) {
+        Player who = null;
+        if (faction == attacker) {
+          who = _player;
+        } else {
+          for (int id : _ref.getWarState().getPlayersOf(faction)) {
+            Player p = _ref.getPlayerByID(id);
+            if (!_ref.isEliminated(id) && (who == null || id < who.getID())) {
+              who = p;
+            }
+          }
+        }
+        if (who == null || _ref.isAutoCasualties(who.getID())) {
+          return null;
+        }
+        return who.getID();
+      }
+    };
+  }
+
   @Override
   public Map<Integer, ActionResponse> execute() {
     String problem = WarTurn.problem(_ref, _player, "fight");
@@ -113,11 +141,21 @@ public class DeclareCombat implements Action {
       }
       defender = only;
     }
-    String result;
+    WarCombat.Outcome outcome;
+    WarCombat.Fight fight;
     try {
-      result = WarCombat.fight(_ref, attacker, defender, tile, toBuildings, _die);
+      fight = WarCombat.start(_ref, attacker, defender, tile, toBuildings, _die,
+          chooser(attacker));
+      outcome = fight.begin();
     } catch (IllegalArgumentException e) {
       return fail(e.getMessage());
+    }
+    String result = outcome.getLog();
+    if (!outcome.isFinished()) {
+      // somebody has a real choice of casualties: the fight waits for them
+      ChooseCasualties.register(_ref, fight, outcome.getPending());
+      result = ChooseCasualties.waitingMessage(_ref, outcome.getPending(),
+          result);
     }
     Map<Integer, ActionResponse> toRet = new HashMap<>();
     for (Player p : _ref.getPlayers()) {
