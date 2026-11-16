@@ -30,6 +30,8 @@ import edu.brown.cs.actions.LaunchBomb;
 import edu.brown.cs.actions.Research;
 import edu.brown.cs.actions.Rebuild;
 import edu.brown.cs.actions.PlayWarCard;
+import edu.brown.cs.actions.SetAutoCasualties;
+import edu.brown.cs.actions.GiveCards;
 import edu.brown.cs.actions.PlayBorderRaid;
 import edu.brown.cs.actions.PlayKnight;
 import edu.brown.cs.actions.PlayMonopoly;
@@ -147,6 +149,10 @@ public class ActionFactory {
                   .getAsJsonObject()), actionJSON);
         case PlayWarCard.ID:
           return new PlayWarCard(_referee, playerID, actionJSON);
+        case SetAutoCasualties.ID:
+          return new SetAutoCasualties(_referee, playerID, actionJSON);
+        case GiveCards.ID:
+          return new GiveCards(_referee, playerID, actionJSON);
         case Research.ID:
           return new Research(_referee, playerID, actionJSON);
         case BuyBomb.ID:

@@ -109,7 +109,8 @@ public class CatanConverter {
           .getID() : -1;
       this.hand = new Hand(ref.getPlayerByID(playerID),
           ref.getGameSettings().isCitiesAndKnights,
-          ref.getGameSettings().isCursedCatan, ref.isWarActive());
+          ref.getGameSettings().isCursedCatan, ref.isWarActive(),
+          ref.isAutoCasualties(playerID));
       this.board = new BoardRaw(ref, ref.getBoard(),
           playerID);
       this.turnOrder = (ref.getGameStatus() != GameStatus.WAITING) ? ref
@@ -209,8 +210,10 @@ public class CatanConverter {
     private Boolean canBuildTestSite;
     private Integer socialCredit;
     private Integer numBombs;
+    private Boolean autoCasualties;
 
-    public Hand(Player player, boolean isCK, boolean isCursed, boolean war) {
+    public Hand(Player player, boolean isCK, boolean isCursed, boolean war,
+        boolean auto) {
       resources = player.getResources();
       devCards = player.getDevCards();
       canBuildRoad = player.canBuildRoad();
@@ -223,6 +226,7 @@ public class CatanConverter {
         canBuildFortress = player.canBuildFortress();
         canBuildTestSite = player.canBuildTestSite();
         socialCredit = player.getSocialCredit();
+        autoCasualties = auto;
         if (war) {
           numBombs = player.numBombs();
         }
