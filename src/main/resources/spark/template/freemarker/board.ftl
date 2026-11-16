@@ -819,6 +819,47 @@
 	<div id="war-form" style="margin-top:4px;"></div>
 </div>
 
+<!-- Cursed Catan: choose which of your units are lost in a fight -->
+<div class="modal fade" id="casualty-modal" tabindex="-1" role="dialog" data-backdrop="static" data-keyboard="false">
+	<div class="modal-dialog" role="document">
+		<div class="modal-content">
+			<div class="modal-header">
+				<h4 class="modal-title">Choose your casualties</h4>
+			</div>
+			<div class="modal-body">
+				<p id="casualty-message"></p>
+				<div id="casualty-rows"></div>
+				<p>Chosen: <strong id="casualty-total">0</strong> / <span id="casualty-required">0</span></p>
+				<label style="font-weight:normal;"><input type="checkbox" class="auto-casualties-toggle"> Always pick my casualties for me (cheapest first)</label>
+			</div>
+			<div class="modal-footer">
+				<button type="button" class="btn btn-default" id="casualty-auto-btn">Pick for me</button>
+				<button type="button" class="btn btn-primary" id="casualty-confirm-btn" disabled>Confirm</button>
+			</div>
+		</div>
+	</div>
+</div>
+
+<!-- Cursed Catan: give cards to a player of your faction -->
+<div class="modal fade" id="gift-modal" tabindex="-1" role="dialog">
+	<div class="modal-dialog" role="document">
+		<div class="modal-content">
+			<div class="modal-header">
+				<button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+				<h4 class="modal-title">Give cards to a teammate</h4>
+			</div>
+			<div class="modal-body">
+				<p>Give to: <select id="gift-to" class="form-control" style="display:inline-block; width:auto;"></select></p>
+				<div id="gift-rows"></div>
+			</div>
+			<div class="modal-footer">
+				<button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
+				<button type="button" class="btn btn-primary" id="gift-confirm-btn" disabled>Give</button>
+			</div>
+		</div>
+	</div>
+</div>
+
 <!-- Modals -->
 
 <div class="modal fade" id="buy-dev-card-modal" tabindex="-1" role="dialog" aria-labelledby="buyDevCardLabel">
