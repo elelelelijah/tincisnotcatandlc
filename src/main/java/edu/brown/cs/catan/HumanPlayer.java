@@ -93,7 +93,7 @@ public class HumanPlayer implements Player {
         resources.put(r, Settings.INITIAL_RESOURCES
             + (stocked ? Settings.CURSED_TEST_STARTING_STOCK : 0.0));
       } else {
-        resources.put(r, Settings.INITIAL_RESOURCES+25.0);
+        resources.put(r, Settings.INITIAL_RESOURCES);
       }
     }
     // Initialize development card hand:
